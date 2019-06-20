@@ -1303,6 +1303,7 @@ int ext_put_video_frame(struct vframe_s *vf)
 	video_vf_put(vf);
 	return 0;
 }
+EXPORT_SYMBOL(ext_put_video_frame);
 
 static int is_need_framepacking_output(void)
 {
@@ -1322,6 +1323,8 @@ int ext_register_end_frame_callback(struct amvideocap_req *req)
 	mutex_unlock(&video_module_mutex);
 	return 0;
 }
+EXPORT_SYMBOL(ext_register_end_frame_callback);
+
 int ext_frame_capture_poll(int endflags)
 {
 	mutex_lock(&video_module_mutex);
@@ -1340,6 +1343,8 @@ int ext_frame_capture_poll(int endflags)
 	mutex_unlock(&video_module_mutex);
 	return 0;
 }
+EXPORT_SYMBOL(ext_frame_capture_poll);
+
 #endif
 
 

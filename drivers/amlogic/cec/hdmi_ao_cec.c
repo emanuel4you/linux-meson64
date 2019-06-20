@@ -1314,7 +1314,7 @@ try_again:
 		return CEC_FAIL_BUSY;
 	}
 	cec_tx_result = -1;
-	ret = wait_for_completion_timeout(&cec_dev->tx_ok, t);
+	ret = wait_for_completion_interruptible_timeout(&cec_dev->tx_ok, t);
 	if (ret <= 0) {
 		/* timeout or interrupt */
 		if (ret == 0) {
@@ -2496,7 +2496,7 @@ static ssize_t hdmitx_cec_read(struct file *f, char __user *buf,
 	if ((cec_dev->hal_flag & (1 << HDMI_OPTION_SYSTEM_CEC_CONTROL)))
 		rx_len = 0;
 	/*CEC_ERR("read msg start\n");*/
-	ret = wait_for_completion_timeout(&cec_dev->rx_ok, CEC_FRAME_DELAY);
+	ret = wait_for_completion_interruptible_timeout(&cec_dev->rx_ok, CEC_FRAME_DELAY);
 	if (ret <= 0) {
 		/*CEC_ERR("read msg ret=0\n");*/
 		return ret;

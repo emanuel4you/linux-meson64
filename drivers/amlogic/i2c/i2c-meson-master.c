@@ -428,7 +428,7 @@ static int meson_i2c_xfer_msg(struct meson_i2c *i2c, struct i2c_msg *msg,
 	int ret = 0;
 
 	i2c->msg = msg;
-	i2c->last = last;
+	i2c->last = last || msg->flags & I2C_M_STOP;
 	i2c->pos = 0;
 	i2c->count = 0;
 	i2c->error = 0;

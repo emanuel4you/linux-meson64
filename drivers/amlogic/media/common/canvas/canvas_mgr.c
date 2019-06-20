@@ -99,6 +99,7 @@ int canvas_pool_map_alloc_canvas(const char *owner)
 {
 	return canvas_pool_map_alloc_canvas_in(get_canvas_pool(), owner);
 }
+EXPORT_SYMBOL(canvas_pool_map_alloc_canvas);
 
 /*
  *num >=1 && <=4
@@ -213,6 +214,7 @@ int canvas_pool_map_free_canvas(int index)
 {
 	return canvas_pool_map_free_canvas_in(get_canvas_pool(), index);
 }
+EXPORT_SYMBOL(canvas_pool_map_free_canvas);
 
 int canvas_pool_canvas_num(void)
 {

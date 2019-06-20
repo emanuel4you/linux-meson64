@@ -1186,6 +1186,8 @@ static void hdmitx_sdr_hdr_uevent(struct hdmitx_dev *hdev)
 	}
 }
 
+
+
 static void hdr_work_func(struct work_struct *work)
 {
 	struct hdmitx_dev *hdev =
@@ -1200,7 +1202,7 @@ static void hdr_work_func(struct work_struct *work)
 		hdmitx_device.HWOp.CntlConfig(&hdmitx_device,
 			CONF_AVI_BT2020, hdev->colormetry);
 
-		msleep(1500);/*delay 1.5s*/
+		msleep_interruptible(1500); /*delay 1.5s*/
 		hdev->HWOp.SetPacket(HDMI_PACKET_DRM, NULL, NULL);
 		hdev->hdmi_current_hdr_mode = 0;
 		hdmitx_sdr_hdr_uevent(hdev);
