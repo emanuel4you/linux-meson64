@@ -114,7 +114,7 @@ static u32 tsync_pcr_recovery_span = 3; /* 10 */
 #define MIN_SYNC_ACHACH_TIME   27000
 
 #define PLAY_MODE_THRESHOLD 500	/*ms*/
-#define PLAY_PCR_INVALID_THRESHOLD	(10*90000)
+#define PLAY_PCR_INVALID_THRESHOLD	(30*90000)
 /* ------------------------------------------------------------------ */
 /* The const */
 

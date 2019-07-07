@@ -1262,6 +1262,8 @@ int ext_get_cur_video_frame(struct vframe_s **vf, int *canvas_index)
 	*vf = cur_dispbuf;
 	return 0;
 }
+EXPORT_SYMBOL(ext_get_cur_video_frame);
+
 static void dump_vframe_status(const char *name)
 {
 	int ret = -1;
