@@ -144,22 +144,28 @@ static char *bl_method_type_to_str(int type)
 	return str;
 }
 
-static unsigned int pwm_reg_txl[6] = {
+static unsigned int pwm_reg_txl[8] = {
 	PWM_PWM_A,
 	PWM_PWM_B,
 	PWM_PWM_C,
 	PWM_PWM_D,
 	PWM_PWM_E,
 	PWM_PWM_F,
+	AO_PWM_PWM_A,
+	AO_PWM_PWM_B,
 };
 
-static unsigned int pwm_reg_txlx[6] = {
+static unsigned int pwm_reg_txlx[10] = {
 	PWM_PWM_A_TXLX,
 	PWM_PWM_B_TXLX,
 	PWM_PWM_C_TXLX,
 	PWM_PWM_D_TXLX,
 	PWM_PWM_E_TXLX,
 	PWM_PWM_F_TXLX,
+	AO_PWM_PWM_A_TXLX,
+	AO_PWM_PWM_B_TXLX,
+	AO_PWM_PWM_C_TXLX,
+	AO_PWM_PWM_D_TXLX,
 };
 
 static int aml_bl_check_driver(void)
@@ -571,6 +577,10 @@ void bl_pwm_ctrl(struct bl_pwm_config_s *bl_pwm, int status)
 		case BL_PWM_D:
 		case BL_PWM_E:
 		case BL_PWM_F:
+		case BL_PWM_AO_A:
+		case BL_PWM_AO_B:
+		case BL_PWM_AO_C:
+		case BL_PWM_AO_D:
 			bl_set_pwm_normal(bl_pwm, pol, out_level);
 			break;
 		case BL_PWM_VS:
@@ -588,6 +598,10 @@ void bl_pwm_ctrl(struct bl_pwm_config_s *bl_pwm, int status)
 		case BL_PWM_D:
 		case BL_PWM_E:
 		case BL_PWM_F:
+		case BL_PWM_AO_A:
+		case BL_PWM_AO_B:
+		case BL_PWM_AO_C:
+		case BL_PWM_AO_D:
 			if (IS_ERR_OR_NULL(bl_pwm->pwm_data.pwm)) {
 				BLERR("%s: invalid bl_pwm_ch\n", __func__);
 				return;
@@ -1261,6 +1275,10 @@ static char *bl_pwm_name[] = {
 	"PWM_D",
 	"PWM_E",
 	"PWM_F",
+	"PWM_AO_A",
+	"PWM_AO_B",
+	"PWM_AO_C",
+	"PWM_AO_D",
 	"PWM_VS",
 	"invalid",
 };
@@ -2597,6 +2615,10 @@ static ssize_t bl_debug_pwm_info_show(struct class *class,
 			case BL_PWM_D:
 			case BL_PWM_E:
 			case BL_PWM_F:
+			case BL_PWM_AO_A:
+			case BL_PWM_AO_B:
+			case BL_PWM_AO_C:
+			case BL_PWM_AO_D:
 				if (IS_ERR_OR_NULL(bl_pwm->pwm_data.pwm)) {
 					len += sprintf(buf+len,
 						"pwm invalid\n");
@@ -2611,8 +2633,12 @@ static ssize_t bl_debug_pwm_info_show(struct class *class,
 					"  enabled:          %d\n",
 					pstate.period, pstate.duty_cycle,
 					pstate.polarity, pstate.enabled);
-				value = bl_cbus_read(bl_drv->data->pwm_reg[
-					bl_pwm->pwm_port]);
+				if (bl_pwm->pwm_port <= BL_PWM_F)
+					value = bl_cbus_read(bl_drv->data->pwm_reg[
+						bl_pwm->pwm_port]);
+				else
+					value = aml_read_aobus(bl_drv->data->pwm_reg[
+						bl_pwm->pwm_port]);
 				len += sprintf(buf+len,
 					"pwm_reg:            0x%08x\n",
 					value);

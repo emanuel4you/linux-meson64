@@ -49,6 +49,15 @@
 #define ENCL_VIDEO_EN                   0x1ca0
 #define ENCL_VIDEO_MAX_LNCNT            0x1cbb
 
+/* pwm_ao reg: aobus */
+#define AO_PWM_PWM_A			0x0550
+#define AO_PWM_PWM_B			0x0554
+/* pwm_ao reg: aobus, txlx */
+#define AO_PWM_PWM_A_TXLX		0x7000
+#define AO_PWM_PWM_B_TXLX		0x7004
+#define AO_PWM_PWM_C_TXLX		0x2000
+#define AO_PWM_PWM_D_TXLX		0x2004
+
 
 static inline unsigned int bl_cbus_read(unsigned int reg)
 {
