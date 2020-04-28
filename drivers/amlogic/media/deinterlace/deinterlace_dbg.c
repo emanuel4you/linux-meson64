@@ -34,6 +34,7 @@
 #include <linux/string.h>
 #include "register.h"
 #include "deinterlace_dbg.h"
+#include "deinterlace_hw.h"
 #include "di_pps.h"
 #include "nr_downscale.h"
 #include <linux/amlogic/media/vfm/vframe_provider.h>
@@ -254,7 +255,8 @@ void dump_di_reg_g12(void)
 		is_meson_txhd_cpu() ||
 		is_meson_g12a_cpu() ||
 		is_meson_g12b_cpu() ||
-		is_meson_tl1_cpu())
+		is_meson_tl1_cpu() || is_meson_tm2_cpu() ||
+		is_meson_sm1_cpu())
 		base_addr = 0xff900000;
 	else
 		base_addr = 0xd0100000;
@@ -473,8 +475,10 @@ void dump_di_pre_stru(struct di_pre_stru_s *di_pre_stru_p)
 		di_pre_stru_p->unreg_req_flag_irq);
 	pr_info("reg_req_flag		   = %d\n",
 		di_pre_stru_p->reg_req_flag);
+	#ifdef DI_KEEP_HIS
 	pr_info("reg_req_flag_irq		   = %d\n",
 		di_pre_stru_p->reg_req_flag_irq);
+	#endif
 	pr_info("cur_width			   = %d\n",
 		di_pre_stru_p->cur_width);
 	pr_info("cur_height			   = %d\n",
@@ -545,8 +549,10 @@ static int dump_di_pre_stru_seq(struct seq_file *seq, void *v)
 		di_pre_stru_p->unreg_req_flag_irq);
 	seq_printf(seq, "%-25s = %d\n", "reg_req_flag",
 		di_pre_stru_p->reg_req_flag);
+	#ifdef DI_KEEP_HIS
 	seq_printf(seq, "%-25s = %d\n", "reg_req_flag_irq",
 		di_pre_stru_p->reg_req_flag_irq);
+	#endif
 	seq_printf(seq, "%-25s = %d\n", "cur_width",
 		di_pre_stru_p->cur_width);
 	seq_printf(seq, "%-25s = %d\n", "cur_height",
@@ -581,6 +587,10 @@ static int dump_di_pre_stru_seq(struct seq_file *seq, void *v)
 		di_pre_stru_p->bypass_pre ? "true" : "false");
 	seq_printf(seq, "%-25s = %s\n", "invert_flag",
 		di_pre_stru_p->invert_flag ? "true" : "false");
+	seq_printf(seq, "%-25s = %s\n", "combing_fix_en",
+		   di_pre_stru_p->combing_fix_en ? "true" : "false");
+	seq_printf(seq, "%-25s = %d\n", "comb_mode",
+		   di_pre_stru_p->comb_mode);
 
 	return 0;
 }
@@ -630,7 +640,9 @@ void dump_mif_size_state(struct di_pre_stru_s *pre_stru_p,
 {
 	pr_info("======pre mif status======\n");
 	pr_info("DI_PRE_CTRL=0x%x\n", Rd(DI_PRE_CTRL));
-	pr_info("DI_PRE_SIZE=0x%x\n", Rd(DI_PRE_SIZE));
+	pr_info("DI_PRE_SIZE H=%d, V=%d\n",
+		(Rd(DI_PRE_SIZE)>>16)&0xffff,
+		Rd(DI_PRE_SIZE)&0xffff);
 	pr_info("DNR_HVSIZE=0x%x\n", Rd(DNR_HVSIZE));
 	if (cpu_after_eq(MESON_CPU_MAJOR_ID_G12A)) {
 		pr_info("CONTWR_CAN_SIZE=0x%x\n", Rd(0x37ec));
@@ -870,6 +882,8 @@ void dump_vframe(struct vframe_s *vf)
 		vf->process_fun, vf->private_data);
 	pr_info("pixel_ratio %d list %p\n",
 		vf->pixel_ratio, &vf->list);
+	pr_info("di_pulldown 0x%x\n", vf->di_pulldown);
+	pr_info("di_gmv 0x%x\n", vf->di_gmv);
 }
 
 void print_di_buf(struct di_buf_s *di_buf, int format)
@@ -1043,6 +1057,51 @@ void dump_buf_addr(struct di_buf_s *di_buf, unsigned int num)
 		pr_info("mv_adr 0x%lx, mcinfo_adr 0x%lx.\n",
 			di_buf_p->mcvec_adr, di_buf_p->mcinfo_adr);
 	}
+}
+
+void dump_afbcd_reg(void)
+{
+	u32 i;
+	u32 afbc_reg;
+
+	pr_info("---- dump afbc eAFBC_DEC0 reg -----\n");
+	for (i = 0; i < AFBC_REG_INDEX_NUB; i++) {
+		afbc_reg = reg_AFBC[eAFBC_DEC0][i];
+		pr_info("reg 0x%x val:0x%x\n", afbc_reg, RDMA_RD(afbc_reg));
+	}
+	pr_info("---- dump afbc eAFBC_DEC1 reg -----\n");
+	for (i = 0; i < AFBC_REG_INDEX_NUB; i++) {
+		afbc_reg = reg_AFBC[eAFBC_DEC1][i];
+		pr_info("reg 0x%x val:0x%x\n", afbc_reg, RDMA_RD(afbc_reg));
+	}
+	pr_info("reg 0x%x val:0x%x\n",
+		VD1_AFBCD0_MISC_CTRL, RDMA_RD(VD1_AFBCD0_MISC_CTRL));
+	pr_info("reg 0x%x val:0x%x\n",
+		VD2_AFBCD1_MISC_CTRL, RDMA_RD(VD2_AFBCD1_MISC_CTRL));
+}
+
+static int dbg_patch_mov_data_show(struct seq_file *seq, void *v)
+{
+	struct di_dev_s *de_devp = get_di_de_devp();
+	struct di_patch_mov_s *pmov = &de_devp->mov;
+	int i;
+
+	seq_printf(seq, "mode:%d\n", pmov->mode);
+	seq_printf(seq, "en_support:%d\n", pmov->en_support);
+	seq_printf(seq, "number:%d\n", pmov->nub);
+	seq_printf(seq, "update:%d\n", pmov->update);
+	for (i = 0; i < DI_PATCH_MOV_MAX_NUB; i++) {
+		seq_printf(seq, "index:[%d]\n", i);
+		seq_printf(seq, "\treg:0x%x\n", pmov->reg_addr[i]);
+		if (i < pmov->nub)
+			seq_printf(seq, "\t\t= 0x%x\n",
+				   RDMA_RD(pmov->reg_addr[i]));
+		seq_printf(seq, "\tdb_val:0x%x\n", pmov->val_db[i].val);
+		seq_printf(seq, "\tdb_en :0x%x\n", pmov->val_db[i].en);
+		seq_printf(seq, "\tpq_val:0x%x\n", pmov->val_pq[i].val);
+		seq_printf(seq, "\tpq_val:0x%x\n", pmov->val_pq[i].en);
+	}
+	return 0;
 }
 
 /*2018-08-17 add debugfs*/
@@ -1223,6 +1282,8 @@ DEFINE_SHOW_DI(seq_file_di_state);
 DEFINE_SHOW_DI(seq_file_dump_di_reg);
 DEFINE_SHOW_DI(seq_file_dump_mif_size_state);
 DEFINE_SHOW_DI(seq_file_afbc);
+DEFINE_SHOW_DI(reg_cue_int);
+DEFINE_SHOW_DI(dbg_patch_mov_data);
 
 struct di_debugfs_files_t {
 	const char *name;
@@ -1235,6 +1296,8 @@ static struct di_debugfs_files_t di_debugfs_files[] = {
 	{"dumpreg", S_IFREG | 0644, &seq_file_dump_di_reg_fops},
 	{"dumpmif", S_IFREG | 0644, &seq_file_dump_mif_size_state_fops},
 	{"dumpafbc", S_IFREG | 0644, &seq_file_afbc_fops},
+	{"reg_cue", S_IFREG | 0644, &reg_cue_int_fops},
+	{"dumpmov", S_IFREG | 0644, &dbg_patch_mov_data_fops},
 };
 
 void di_debugfs_init(void)

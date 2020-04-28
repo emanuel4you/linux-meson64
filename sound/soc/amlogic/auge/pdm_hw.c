@@ -19,28 +19,39 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-/*#include <linux/delay.h>*/
+#include <linux/spinlock.h>
 
 #include "pdm_hw.h"
 #include "regs.h"
 #include "iomap.h"
-#include "pdm_hw_coeff.c"
+#include "pdm_hw_coeff.h"
 
+static DEFINE_SPINLOCK(pdm_lock);
+static unsigned long pdm_enable_cnt;
 void pdm_enable(int is_enable)
 {
-	if (is_enable) {
-		aml_pdm_update_bits(
-			PDM_CTRL,
-			0x1 << 31,
-			is_enable << 31);
-	} else {
-		aml_pdm_update_bits(
-			PDM_CTRL,
-			0x1 << 31 | 0x1 << 16,
-			0 << 31 | 0 << 16);
+	unsigned long flags;
 
-		/*udelay(1000);*/
+	spin_lock_irqsave(&pdm_lock, flags);
+	if (is_enable) {
+		if (pdm_enable_cnt == 0)
+			aml_pdm_update_bits(
+				PDM_CTRL,
+				0x1 << 31,
+				is_enable << 31);
+		pdm_enable_cnt++;
+	} else {
+		if (WARN_ON(pdm_enable_cnt == 0))
+			goto exit;
+		if (--pdm_enable_cnt == 0)
+			aml_pdm_update_bits(
+				PDM_CTRL,
+				0x1 << 31 | 0x1 << 16,
+				0 << 31 | 0 << 16);
 	}
+
+exit:
+	spin_unlock_irqrestore(&pdm_lock, flags);
 }
 
 void pdm_fifo_reset(void)
@@ -59,50 +70,13 @@ void pdm_fifo_reset(void)
 		0x1 << 16);
 }
 
-void aml_pdm_ctrl(
-	struct aml_audio_controller *actrl,
-	int bitdepth, int channels)
+void pdm_force_sysclk_to_oscin(bool force)
 {
-	int mode, i, ch_mask = 0, sample_count;
+	audiobus_update_bits(EE_AUDIO_CLK_PDMIN_CTRL1, 0x1 << 30, force << 30);
+}
 
-	/* sameple count */
-	if (pdm_dclk == 1)
-		sample_count = 38;
-	else if (pdm_dclk == 2)
-		sample_count = 48;
-	else
-		sample_count = 18;
-
-	if (bitdepth == 32)
-		mode = 0;
-	else
-		mode = 1;
-
-	for (i = 0; i < channels; i++)
-		ch_mask |= (1 << i);
-
-	pr_info("%s, channels mask:%x\n", __func__, ch_mask);
-
-	aml_pdm_write(PDM_CLKG_CTRL, 1);
-
-	/* must be sure that clk and pdm is enable */
-	aml_pdm_update_bits(PDM_CTRL,
-				(0x7 << 28 | 0xff << 8 | 0xff << 0),
-				/*(1 << 31) |*/
-				/* invert the PDM_DCLK or not */
-				(0 << 30) |
-				/* output mode:  1: 24bits. 0: 32 bits */
-				(mode << 29) |
-				/* bypass mode.
-				 * 1: bypass all filter. 0: normal mode.
-				 */
-				(0 << 28) |
-				/* PDM channel reset. */
-				(ch_mask << 8) |
-				/* PDM channel enable */
-				(ch_mask << 0)
-				);
-
+void pdm_set_channel_ctrl(int sample_count)
+{
 	aml_pdm_write(PDM_CHAN_CTRL, ((sample_count << 24) |
 					(sample_count << 16) |
 					(sample_count << 8) |
@@ -113,6 +87,69 @@ void aml_pdm_ctrl(
 					(sample_count << 8) |
 					(sample_count << 0)
 		));
+}
+
+void aml_pdm_ctrl(struct pdm_info *info)
+{
+	int mode, i, ch_mask = 0;
+	int pdm_chs, lane_chs = 0;
+
+	if (!info)
+		return;
+
+	if (info->bitdepth == 32)
+		mode = 0;
+	else
+		mode = 1;
+
+	/* update pdm channels for loopback */
+	pdm_chs = info->channels;
+	if (info->channels > PDM_CHANNELS_MAX)
+		pdm_chs = PDM_CHANNELS_MAX;
+
+	if (pdm_chs > info->lane_masks * 2)
+		pr_warn("capturing channels more than lanes carried\n");
+
+	/* each lanes carries two channels */
+	for (i = 0; i < PDM_LANE_MAX; i++)
+		if ((1 << i) & info->lane_masks) {
+			ch_mask |= (1 << (2 * i));
+			lane_chs += 1;
+			if (lane_chs >= info->channels)
+				break;
+			ch_mask |= (1 << (2 * i + 1));
+			lane_chs += 1;
+			if (lane_chs >= info->channels)
+				break;
+		}
+
+	pr_info("%s, lane mask:0x%x, channels:%d, channels mask:0x%x, bypass:%d\n",
+		__func__,
+		info->lane_masks,
+		info->channels,
+		ch_mask,
+		info->bypass);
+
+	aml_pdm_write(PDM_CLKG_CTRL, 1);
+
+	/* must be sure that clk and pdm is enable */
+	aml_pdm_update_bits(PDM_CTRL,
+				(0x7 << 28 | 0xff << 8 | 0xff << 0),
+				/* invert the PDM_DCLK or not */
+				(0 << 30) |
+				/* output mode:  1: 24bits. 0: 32 bits */
+				(mode << 29) |
+				/* bypass mode.
+				 * 1: bypass all filter. 0: normal mode.
+				 */
+				(info->bypass << 28) |
+				/* PDM channel reset. */
+				(ch_mask << 8) |
+				/* PDM channel enable */
+				(ch_mask << 0)
+				);
+
+	pdm_set_channel_ctrl(info->sample_count);
 }
 
 void aml_pdm_arb_config(struct aml_audio_controller *actrl)
@@ -315,9 +352,6 @@ void aml_pdm_filter_ctrl(int osr, int mode)
 	int lpf1_len, lpf2_len, lpf3_len;
 	const int *lpf1_coeff, *lpf2_coeff, *lpf3_coeff;
 
-	pr_info("%s, osr:%d, mode:%d\n",
-		__func__, osr, mode);
-
 	/* select LPF coefficent
 	 * For filter 1 and filter 3,
 	 * it's only relative with coefficent mode
@@ -453,6 +487,11 @@ void pdm_set_mute_channel(int mute_chmask)
 		(mute_chmask << 20 | mute_en << 17));
 }
 
+void pdm_set_bypass_data(bool bypass)
+{
+	aml_pdm_update_bits(PDM_CTRL, 0x1 << 28, bypass << 28);
+}
+
 void pdm_init_truncate_data(int freq)
 {
 	int mask_val;
@@ -461,4 +500,96 @@ void pdm_init_truncate_data(int freq)
 	mask_val = ((freq / 1000) * 1050) / 1000 - 1;
 
 	aml_pdm_write(PDM_MASK_NUM, mask_val);
+}
+
+void pdm_train_en(bool en)
+{
+	aml_pdm_update_bits(PDM_CTRL,
+		0x1 << 19,
+		en << 19);
+}
+
+void pdm_train_clr(void)
+{
+	aml_pdm_update_bits(PDM_CTRL,
+		0x1 << 18,
+		0x1 << 18);
+}
+
+int pdm_train_sts(void)
+{
+	int val = aml_pdm_read(PDM_STS);
+
+	return ((val >> 4) & 0xff);
+}
+
+int pdm_dclkidx2rate(int idx)
+{
+	int rate;
+
+	if (idx == 2)
+		rate = 768000;
+	else if (idx == 1)
+		rate = 1024000;
+	else
+		rate = 3072000;
+
+	return rate;
+}
+
+int pdm_get_sample_count(int isLowPower, int dclk_idx)
+{
+	int count = 0;
+
+	if (isLowPower)
+		count = 0;
+	else if (dclk_idx == 1)
+		count = 38;
+	else if (dclk_idx  == 2)
+		count = 48;
+	else
+		count = 18;
+
+	return count;
+}
+
+int pdm_get_ors(int dclk_idx, int sample_rate)
+{
+	int osr = 0;
+
+	if (dclk_idx == 1) {
+		if (sample_rate == 16000)
+			osr = 64;
+		else if (sample_rate == 8000)
+			osr = 128;
+		else
+			pr_err("%s, Not support rate:%d\n",
+				__func__, sample_rate);
+	} else if (dclk_idx == 2) {
+		if (sample_rate == 16000)
+			osr = 48;
+		else if (sample_rate == 8000)
+			osr = 96;
+		else
+			pr_err("%s, Not support rate:%d\n",
+				__func__, sample_rate);
+	} else {
+		if (sample_rate == 96000)
+			osr = 32;
+		else if (sample_rate == 64000)
+			osr = 48;
+		else if (sample_rate == 48000)
+			osr = 64;
+		else if (sample_rate == 32000)
+			osr = 96;
+		else if (sample_rate == 16000)
+			osr = 192;
+		else if (sample_rate == 8000)
+			osr = 384;
+		else
+			pr_err("%s, Not support rate:%d\n",
+				__func__, sample_rate);
+	}
+
+	return osr;
 }

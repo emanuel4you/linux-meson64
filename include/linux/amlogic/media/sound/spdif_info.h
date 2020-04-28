@@ -29,6 +29,8 @@ struct iec958_chsts {
 	unsigned short chstat1_r;
 };
 
+bool spdifout_is_raw(void);
+
 extern bool spdif_is_4x_clk(void);
 
 extern void spdif_get_channel_status_info(struct iec958_chsts *chsts,
@@ -45,4 +47,10 @@ extern int spdif_format_get_enum(
 extern int spdif_format_set_enum(
 	struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol);
+#ifdef CONFIG_AMLOGIC_HDMITX
+int aml_get_hdmi_out_audio(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+int aml_set_hdmi_out_audio(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol);
+#endif
 #endif

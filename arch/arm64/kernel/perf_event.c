@@ -19,10 +19,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef CONFIG_AMLOGIC_MODIFY
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-#endif
-
 #include <asm/irq_regs.h>
 #include <asm/perf_event.h>
 #include <asm/sysreg.h>
@@ -33,18 +29,6 @@
 #include <linux/perf/arm_pmu.h>
 #include <linux/platform_device.h>
 
-
-#ifdef CONFIG_AMLOGIC_MODIFY
-#include <linux/of.h>
-#include <linux/of_irq.h>
-#include <linux/of_device.h>
-#include <linux/irq.h>
-#include <asm/irq.h>
-#include <linux/interrupt.h>
-#include <linux/irqdesc.h>
-#include <linux/of_address.h>
-#include <linux/delay.h>
-#endif
 
 /*
  * ARMv8 PMUv3 Performance Events handling code.
@@ -465,6 +449,49 @@ ARMV8_EVENT_ATTR(l2i_tlb_refill, ARMV8_PMUV3_PERFCTR_L2I_TLB_REFILL);
 ARMV8_EVENT_ATTR(l2d_tlb, ARMV8_PMUV3_PERFCTR_L2D_TLB);
 ARMV8_EVENT_ATTR(l2i_tlb, ARMV8_PMUV3_PERFCTR_L2I_TLB);
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+/* a53/a55 common */
+ARMV8_EVENT_ATTR(a5x_stall_frontend_cache, 0xe1);
+ARMV8_EVENT_ATTR(a5x_stall_frontend_tlb, 0xe2);
+ARMV8_EVENT_ATTR(a5x_stall_frontend_pderr, 0xe3);
+ARMV8_EVENT_ATTR(a5x_stall_backend_ilock_agu, 0xe5);
+ARMV8_EVENT_ATTR(a5x_stall_backend_ilock_fpu, 0xe6);
+ARMV8_EVENT_ATTR(a5x_stall_backend_ld, 0xe7);
+ARMV8_EVENT_ATTR(a5x_stall_backend_st, 0xe8);
+ARMV8_EVENT_ATTR(a5x_l2d_cache, 0x16);
+ARMV8_EVENT_ATTR(a5x_l2d_cache_refill, 0x17);
+
+/* a55 events */
+ARMV8_EVENT_ATTR(a55_stall_frontend, 0x23);
+ARMV8_EVENT_ATTR(a55_stall_backend, 0x24);
+ARMV8_EVENT_ATTR(a55_stall_backend_ilock, 0xe4);
+ARMV8_EVENT_ATTR(a55_l1d_cache_refill_inner, 0x44);
+ARMV8_EVENT_ATTR(a55_l1d_cache_refill_outer, 0x45);
+ARMV8_EVENT_ATTR(a55_l1d_cache_refill_prefetch, 0xc2);
+ARMV8_EVENT_ATTR(a55_l2d_cache_refill_prefetch, 0xc1);
+ARMV8_EVENT_ATTR(a55_l3d_cache_refill_prefetch, 0xc0);
+ARMV8_EVENT_ATTR(a55_stall_backend_ld_cache, 0xe9);
+ARMV8_EVENT_ATTR(a55_stall_backend_ld_tlb, 0xea);
+ARMV8_EVENT_ATTR(a55_stall_backend_st_stb, 0xeb);
+ARMV8_EVENT_ATTR(a55_stall_backend_st_tlb, 0xec);
+ARMV8_EVENT_ATTR(a55_l1d_cache_rd, 0x40);
+ARMV8_EVENT_ATTR(a55_l1d_cache_wr, 0x41);
+ARMV8_EVENT_ATTR(a55_l1d_cache_refill_rd, 0x42);
+ARMV8_EVENT_ATTR(a55_l1d_cache_refill_wr, 0x43);
+ARMV8_EVENT_ATTR(a55_l2d_cache_rd, 0x50);
+ARMV8_EVENT_ATTR(a55_l2d_cache_wr, 0x51);
+ARMV8_EVENT_ATTR(a55_l2d_cache_refill_rd, 0x52);
+ARMV8_EVENT_ATTR(a55_l2d_cache_refill_wr, 0x53);
+ARMV8_EVENT_ATTR(a55_l3d_cache_rd, 0xa0);
+ARMV8_EVENT_ATTR(a55_l3d_cache_refill_rd, 0xa2);
+
+/* a53 events */
+ARMV8_EVENT_ATTR(a53_cache_refill_prefetch, 0xc2);
+ARMV8_EVENT_ATTR(a53_scu_snooped, 0xc8);
+ARMV8_EVENT_ATTR(a53_stall_backend_st_stb, 0xc7);
+ARMV8_EVENT_ATTR(a53_stall_frontend_other, 0xe0);
+#endif
+
 static struct attribute *armv8_pmuv3_event_attrs[] = {
 	&armv8_event_attr_sw_incr.attr.attr,
 	&armv8_event_attr_l1i_cache_refill.attr.attr,
@@ -514,6 +541,46 @@ static struct attribute *armv8_pmuv3_event_attrs[] = {
 	&armv8_event_attr_l2i_tlb_refill.attr.attr,
 	&armv8_event_attr_l2d_tlb.attr.attr,
 	&armv8_event_attr_l2i_tlb.attr.attr,
+#ifdef CONFIG_AMLOGIC_MODIFY
+	/* a55/a53 common events */
+	&armv8_event_attr_a5x_stall_frontend_cache.attr.attr, //0xe1
+	&armv8_event_attr_a5x_stall_frontend_tlb.attr.attr, //0xe2
+	&armv8_event_attr_a5x_stall_frontend_pderr.attr.attr, //0xe3
+	&armv8_event_attr_a5x_stall_backend_ilock_agu.attr.attr, //0xe5
+	&armv8_event_attr_a5x_stall_backend_ilock_fpu.attr.attr, //0xe6
+	&armv8_event_attr_a5x_stall_backend_ld.attr.attr,  //0xe7
+	&armv8_event_attr_a5x_stall_backend_st.attr.attr,  //0xe8
+	&armv8_event_attr_a5x_l2d_cache.attr.attr, //0x16
+	&armv8_event_attr_a5x_l2d_cache_refill.attr.attr, //0x17
+	/* a55 events */
+	&armv8_event_attr_a55_stall_frontend.attr.attr, //0x23
+	&armv8_event_attr_a55_stall_backend.attr.attr,  //0x24
+	&armv8_event_attr_a55_stall_backend_ilock.attr.attr,  //0xe4
+	&armv8_event_attr_a55_stall_backend_ld_cache.attr.attr,  //0xe9
+	&armv8_event_attr_a55_stall_backend_ld_tlb.attr.attr,  //0xea
+	&armv8_event_attr_a55_stall_backend_st_stb.attr.attr,  //0xeb
+	&armv8_event_attr_a55_stall_backend_st_tlb.attr.attr,  //0xec
+	&armv8_event_attr_a55_l1d_cache_refill_inner.attr.attr,  //0x44
+	&armv8_event_attr_a55_l1d_cache_refill_outer.attr.attr,  //0x45
+	&armv8_event_attr_a55_l1d_cache_refill_prefetch.attr.attr,  //0xc2
+	&armv8_event_attr_a55_l2d_cache_refill_prefetch.attr.attr,  //0xc1
+	&armv8_event_attr_a55_l3d_cache_refill_prefetch.attr.attr,  //0xc0
+	&armv8_event_attr_a55_l1d_cache_rd.attr.attr, //0x40
+	&armv8_event_attr_a55_l1d_cache_wr.attr.attr, //0x41
+	&armv8_event_attr_a55_l1d_cache_refill_rd.attr.attr, //0x42
+	&armv8_event_attr_a55_l1d_cache_refill_wr.attr.attr, //0x43
+	&armv8_event_attr_a55_l2d_cache_rd.attr.attr, //0x50
+	&armv8_event_attr_a55_l2d_cache_wr.attr.attr, //0x51
+	&armv8_event_attr_a55_l2d_cache_refill_rd.attr.attr, //0x52
+	&armv8_event_attr_a55_l2d_cache_refill_wr.attr.attr, //0x53
+	&armv8_event_attr_a55_l3d_cache_rd.attr.attr, //0xa0
+	&armv8_event_attr_a55_l3d_cache_refill_rd.attr.attr, //0xa2
+	/* a53 events */
+	&armv8_event_attr_a53_cache_refill_prefetch.attr.attr, //0xc2
+	&armv8_event_attr_a53_scu_snooped.attr.attr, //0xc8
+	&armv8_event_attr_a53_stall_backend_st_stb.attr.attr, //0xc7
+	&armv8_event_attr_a53_stall_frontend_other.attr.attr, //0xe0
+#endif
 	NULL,
 };
 
@@ -521,6 +588,9 @@ static umode_t
 armv8pmu_event_attr_is_visible(struct kobject *kobj,
 			       struct attribute *attr, int unused)
 {
+#ifdef CONFIG_AMLOGIC_MODIFY
+	return 0444;
+#else
 	struct device *dev = kobj_to_dev(kobj);
 	struct pmu *pmu = dev_get_drvdata(dev);
 	struct arm_pmu *cpu_pmu = container_of(pmu, struct arm_pmu, pmu);
@@ -532,6 +602,7 @@ armv8pmu_event_attr_is_visible(struct kobject *kobj,
 		return attr->mode;
 
 	return 0;
+#endif
 }
 
 static struct attribute_group armv8_pmuv3_events_attr_group = {
@@ -766,162 +837,7 @@ static void armv8pmu_disable_event(struct perf_event *event)
 }
 
 #ifdef CONFIG_AMLOGIC_MODIFY
-
-static struct amlpmu_fixup_context amlpmu_fixup_ctx;
-
-static enum hrtimer_restart amlpmu_relax_timer_func(struct hrtimer *timer)
-{
-	struct amlpmu_fixup_cpuinfo *ci;
-
-	ci = per_cpu_ptr(amlpmu_fixup_ctx.cpuinfo, 0);
-
-	pr_alert("enable cpu0_irq %d again, irq cnt = %lu\n",
-		ci->irq_num,
-		ci->irq_cnt);
-	enable_irq(ci->irq_num);
-
-	return HRTIMER_NORESTART;
-}
-
-
-static void amlpmu_relax_timer_start(int other_cpu)
-{
-	struct amlpmu_fixup_cpuinfo *ci;
-	int cpu;
-
-	cpu = smp_processor_id();
-	WARN_ON(cpu != 0);
-
-	ci = per_cpu_ptr(amlpmu_fixup_ctx.cpuinfo, 0);
-
-	pr_alert("wait cpu %d fixup done timeout, main cpu irq cnt = %lu\n",
-			other_cpu,
-			ci->irq_cnt);
-
-	if (hrtimer_active(&amlpmu_fixup_ctx.relax_timer)) {
-		pr_alert("relax_timer already active, return!\n");
-		return;
-	}
-
-	disable_irq_nosync(ci->irq_num);
-
-	hrtimer_start(&amlpmu_fixup_ctx.relax_timer,
-		ns_to_ktime(amlpmu_fixup_ctx.relax_timer_ns),
-		HRTIMER_MODE_REL);
-}
-
-static irqreturn_t armv8pmu_handle_irq(int irq_num, void *dev);
-
-void armv8pmu_handle_irq_ipi(void)
-{
-	int cpu = smp_processor_id();
-
-	WARN_ON(cpu == 0);
-	WARN_ON(!amlpmu_fixup_ctx.dev);
-
-	armv8pmu_handle_irq(-1, amlpmu_fixup_ctx.dev);
-}
-
-static int aml_pmu_fix(void)
-{
-	int i;
-	int cpu;
-	int pmuirq_val;
-	struct amlpmu_fixup_cpuinfo *ci;
-
-	int max_wait_cnt = amlpmu_fixup_ctx.max_wait_cnt;
-
-	pmuirq_val = readl(amlpmu_fixup_ctx.sys_cpu_status0);
-	pmuirq_val &= amlpmu_fixup_ctx.sys_cpu_status0_pmuirq_mask;
-
-	for (cpu = 0; cpu < num_possible_cpus(); cpu++) {
-		if (pmuirq_val & (1<<cpu)) {
-			if (cpu == 0) {
-				pr_debug("cpu0 shouldn't fix pmuirq = 0x%x\n",
-					pmuirq_val);
-			} else {
-				pr_debug("fix pmu irq cpu %d, pmuirq = 0x%x\n",
-					cpu,
-					pmuirq_val);
-
-				ci = per_cpu_ptr(amlpmu_fixup_ctx.cpuinfo,
-					cpu);
-
-				ci->fix_done = 0;
-
-				/* aml pmu IPI will set fix_done to 1 */
-				mb();
-
-				smp_send_aml_pmu(cpu);
-
-				for (i = 0; i < max_wait_cnt; i++) {
-					if (READ_ONCE(ci->fix_done))
-						break;
-
-					udelay(1);
-				}
-
-				if (i == amlpmu_fixup_ctx.max_wait_cnt)
-					amlpmu_relax_timer_start(cpu);
-
-				return 0;
-			}
-		}
-	}
-
-	return 1;
-}
-
-static void aml_pmu_fix_stat_account(int is_empty_irq)
-{
-	int freq;
-	unsigned long time = jiffies;
-	struct amlpmu_fixup_cpuinfo *ci;
-
-	ci = this_cpu_ptr(amlpmu_fixup_ctx.cpuinfo);
-
-	ci->irq_cnt++;
-	ci->irq_time = time;
-	if (!ci->last_irq_cnt) {
-		ci->last_irq_cnt = ci->irq_cnt;
-		ci->last_irq_time = ci->irq_time;
-	}
-
-	if (is_empty_irq) {
-		ci->empty_irq_cnt++;
-		ci->empty_irq_time = time;
-		if (!ci->last_empty_irq_cnt) {
-			ci->last_empty_irq_cnt = ci->empty_irq_cnt;
-			ci->last_empty_irq_time = ci->empty_irq_time;
-		}
-	}
-
-	if (time_after(ci->irq_time, ci->last_irq_time + HZ)) {
-		freq = ci->irq_cnt - ci->last_irq_cnt;
-		freq = freq * HZ / (ci->irq_time - ci->last_irq_time);
-		pr_debug("irq_cnt = %lu, irq_last_cnt = %lu, freq = %d\n",
-			ci->irq_cnt,
-			ci->last_irq_cnt,
-			freq);
-
-		ci->last_irq_cnt = ci->irq_cnt;
-		ci->last_irq_time = ci->irq_time;
-	}
-
-	if (is_empty_irq &&
-		time_after(ci->empty_irq_time, ci->last_empty_irq_time + HZ)) {
-
-		freq = ci->empty_irq_cnt - ci->last_empty_irq_cnt;
-		freq *= HZ;
-		freq /= (ci->empty_irq_time - ci->last_empty_irq_time);
-		pr_debug("empty_irq_cnt = %lu, freq = %d\n",
-			ci->empty_irq_cnt,
-			freq);
-
-		ci->last_empty_irq_cnt = ci->empty_irq_cnt;
-		ci->last_empty_irq_time = ci->empty_irq_time;
-	}
-}
+#include <linux/perf/arm_pmu.h>
 #endif
 
 static irqreturn_t armv8pmu_handle_irq(int irq_num, void *dev)
@@ -933,42 +849,23 @@ static irqreturn_t armv8pmu_handle_irq(int irq_num, void *dev)
 	struct pt_regs *regs;
 	int idx;
 
-#ifdef CONFIG_AMLOGIC_MODIFY
-	int cpu;
-	int is_empty_irq = 0;
-	struct amlpmu_fixup_cpuinfo *ci;
-
-	ci = this_cpu_ptr(amlpmu_fixup_ctx.cpuinfo);
-	ci->irq_num = irq_num;
-	amlpmu_fixup_ctx.dev = dev;
-	cpu = smp_processor_id();
-#endif
-
 	/*
 	 * Get and reset the IRQ flags
 	 */
 	pmovsr = armv8pmu_getreset_flags();
 
 #ifdef CONFIG_AMLOGIC_MODIFY
-	ci->fix_done = 1;
-#endif
+	/* amlpmu have routed the interrupt already, so return IRQ_HANDLED */
+	amlpmu_handle_irq(cpu_pmu,
+			irq_num,
+			armv8pmu_has_overflowed(pmovsr));
+
+	if (!armv8pmu_has_overflowed(pmovsr))
+		return IRQ_HANDLED;
+#else
 	/*
 	 * Did an overflow occur?
 	 */
-#ifdef CONFIG_AMLOGIC_MODIFY
-	if (!armv8pmu_has_overflowed(pmovsr)) {
-		is_empty_irq = 1;
-
-		if (cpu == 0)
-			is_empty_irq = aml_pmu_fix();
-	}
-
-	aml_pmu_fix_stat_account(is_empty_irq);
-
-	/* txlx have some empty pmu irqs, so return IRQ_HANDLED */
-	if (is_empty_irq)
-		return IRQ_HANDLED;
-#else
 	if (!armv8pmu_has_overflowed(pmovsr))
 		return IRQ_NONE;
 #endif
@@ -1013,9 +910,6 @@ static irqreturn_t armv8pmu_handle_irq(int irq_num, void *dev)
 
 	return IRQ_HANDLED;
 }
-
-
-
 
 static void armv8pmu_start(struct arm_pmu *cpu_pmu)
 {
@@ -1308,87 +1202,8 @@ static const struct pmu_probe_info armv8_pmu_probe_table[] = {
 };
 
 
-#ifdef CONFIG_AMLOGIC_MODIFY
-static int amlpmu_fixup_init(struct platform_device *pdev)
-{
-	int ret;
-	void __iomem *base;
-
-	amlpmu_fixup_ctx.cpuinfo = __alloc_percpu(
-		sizeof(struct amlpmu_fixup_cpuinfo), 2 * sizeof(void *));
-	if (!amlpmu_fixup_ctx.cpuinfo) {
-		pr_err("alloc percpu failed\n");
-		return -ENOMEM;
-	}
-
-	base = of_iomap(pdev->dev.of_node, 0);
-	if (IS_ERR(base)) {
-		pr_err("of_iomap() failed, base = %p\n", base);
-		return PTR_ERR(base);
-	}
-
-	ret = of_property_read_u32(pdev->dev.of_node,
-		"sys_cpu_status0_offset",
-		&amlpmu_fixup_ctx.sys_cpu_status0_offset);
-	if (ret) {
-		pr_err("read sys_cpu_status0_offset failed, ret = %d\n", ret);
-		return 1;
-	}
-	pr_debug("sys_cpu_status0_offset = 0x%0x\n",
-		amlpmu_fixup_ctx.sys_cpu_status0_offset);
-
-	ret = of_property_read_u32(pdev->dev.of_node,
-		"sys_cpu_status0_pmuirq_mask",
-		&amlpmu_fixup_ctx.sys_cpu_status0_pmuirq_mask);
-	if (ret) {
-		pr_err("read sys_cpu_status0_pmuirq_mask failed, ret = %d\n",
-			ret);
-		return 1;
-	}
-	pr_debug("sys_cpu_status0_pmuirq_mask = 0x%0x\n",
-		amlpmu_fixup_ctx.sys_cpu_status0_pmuirq_mask);
-
-
-	ret = of_property_read_u32(pdev->dev.of_node,
-		"relax_timer_ns",
-		&amlpmu_fixup_ctx.relax_timer_ns);
-	if (ret) {
-		pr_err("read prop relax_timer_ns failed, ret = %d\n", ret);
-		return 1;
-	}
-	pr_debug("relax_timer_ns = %u\n", amlpmu_fixup_ctx.relax_timer_ns);
-
-
-	ret = of_property_read_u32(pdev->dev.of_node,
-		"max_wait_cnt",
-		&amlpmu_fixup_ctx.max_wait_cnt);
-	if (ret) {
-		pr_err("read prop max_wait_cnt failed, ret = %d\n", ret);
-		return 1;
-	}
-	pr_debug("max_wait_cnt = %u\n", amlpmu_fixup_ctx.max_wait_cnt);
-
-
-	base += (amlpmu_fixup_ctx.sys_cpu_status0_offset << 2);
-	amlpmu_fixup_ctx.sys_cpu_status0 = base;
-	pr_debug("sys_cpu_status0 = %p\n", amlpmu_fixup_ctx.sys_cpu_status0);
-
-
-	hrtimer_init(&amlpmu_fixup_ctx.relax_timer,
-		CLOCK_MONOTONIC,
-		HRTIMER_MODE_REL);
-	amlpmu_fixup_ctx.relax_timer.function = amlpmu_relax_timer_func;
-
-	return 0;
-}
-#endif
-
 static int armv8_pmu_device_probe(struct platform_device *pdev)
 {
-#ifdef CONFIG_AMLOGIC_MODIFY
-	if (amlpmu_fixup_init(pdev))
-		return 1;
-#endif
 	if (acpi_disabled)
 		return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
 					    NULL);

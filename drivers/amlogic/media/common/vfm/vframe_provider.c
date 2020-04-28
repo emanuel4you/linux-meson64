@@ -30,7 +30,7 @@
 #include "vfm.h"
 #include "vftrace.h"
 
-#define MAX_PROVIDER_NUM    32
+#define MAX_PROVIDER_NUM    64
 static struct vframe_provider_s *provider_table[MAX_PROVIDER_NUM];
 static atomic_t provider_used = ATOMIC_INIT(0);
 
@@ -367,6 +367,33 @@ void vf_unreg_provider(struct vframe_provider_s *prov)
 	}
 }
 EXPORT_SYMBOL(vf_unreg_provider);
+void vf_light_reg_provider(struct vframe_provider_s *prov)
+{
+	struct vframe_provider_s *p = NULL;
+	struct vframe_receiver_s *receiver = NULL;
+	int i;
+
+	for (i = 0; i < MAX_PROVIDER_NUM; i++) {
+		p = provider_table[i];
+		if (p && !strcmp(p->name, prov->name)) {
+			if (vfm_debug_flag & 1)
+				pr_err("%s:%s\n", __func__, prov->name);
+			receiver = vf_get_receiver(prov->name);
+			if (receiver && receiver->ops
+				&& receiver->ops->event_cb) {
+				receiver->ops->event_cb(
+						VFRAME_EVENT_PROVIDER_REG,
+						(void *)prov->name,
+						receiver->op_arg);
+			} else{
+				pr_err("%s Error to notify receiver\n",
+						__func__);
+			}
+			break;
+		}
+	}
+}
+EXPORT_SYMBOL(vf_light_reg_provider);
 
 void vf_light_unreg_provider(struct vframe_provider_s *prov)
 {

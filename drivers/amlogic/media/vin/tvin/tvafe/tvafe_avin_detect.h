@@ -104,6 +104,7 @@ enum tvafe_avin_status_e {
 enum tvafe_avin_channel_e {
 	TVAFE_AVIN_CHANNEL1 = 0,
 	TVAFE_AVIN_CHANNEL2 = 1,
+	TVAFE_AVIN_CHANNEL_MAX = 2,
 };
 
 struct tvafe_report_data_s {
@@ -136,6 +137,7 @@ enum avin_cpu_type {
 	AVIN_CPU_TYPE_TXLX   = 1,
 	AVIN_CPU_TYPE_TXHD   = 2,
 	AVIN_CPU_TYPE_TL1   = 3,
+	AVIN_CPU_TYPE_TM2   = 4,
 	AVIN_CPU_TYPE_MAX,
 };
 

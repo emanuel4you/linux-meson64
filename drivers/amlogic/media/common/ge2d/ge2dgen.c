@@ -49,14 +49,17 @@ static inline void _set_src1_format(struct ge2d_src1_data_s *src1_data_cfg,
 	if ((format_src & GE2D_FORMAT_YUV) &&
 	    ((format_dst & GE2D_FORMAT_YUV) == 0)) {
 		dp_gen_cfg->use_matrix_default =
-			(format_src & GE2D_FORMAT_COMP_RANGE) ?
+			(format_src & GE2D_FORMAT_FULL_RANGE) ?
 			MATRIX_FULL_RANGE_YCC_TO_RGB : MATRIX_YCC_TO_RGB;
 		dp_gen_cfg->conv_matrix_en = 1;
 	} else if (((format_src & GE2D_FORMAT_YUV) == 0) &&
 		   (format_dst & GE2D_FORMAT_YUV)) {
 		dp_gen_cfg->use_matrix_default =
-			(format_dst & GE2D_FORMAT_COMP_RANGE) ?
-			MATRIX_RGB_TO_YCC : MATRIX_RGB_TO_FULL_RANGE_YCC;
+			(format_dst & GE2D_FORMAT_FULL_RANGE) ?
+			MATRIX_RGB_TO_FULL_RANGE_YCC : MATRIX_RGB_TO_YCC;
+		dp_gen_cfg->use_matrix_default |=
+			((format_dst & GE2D_FORMAT_BT_STANDARD) ?
+				MATRIX_BT_709 : MATRIX_BT_601);
 		dp_gen_cfg->conv_matrix_en = 1;
 	} else
 		dp_gen_cfg->conv_matrix_en = 0;
@@ -87,6 +90,8 @@ static inline void _set_dst_format(
 		unsigned int format_src,
 		unsigned int format_dst)
 {
+	unsigned int y_yc_ratio;
+
 	src2_dst_data_cfg->dst_format_all = format_dst;
 	src2_dst_data_cfg->dst_format = (format_dst >> 8) & 3;
 	src2_dst_data_cfg->dst_endian = (format_dst & GE2D_ENDIAN_MASK) >>
@@ -100,17 +105,22 @@ static inline void _set_dst_format(
 	if ((format_src & GE2D_FORMAT_YUV) &&
 	    ((format_dst & GE2D_FORMAT_YUV) == 0)) {
 		dp_gen_cfg->use_matrix_default =
-			(format_src & GE2D_FORMAT_COMP_RANGE) ?
+			(format_src & GE2D_FORMAT_FULL_RANGE) ?
 			MATRIX_FULL_RANGE_YCC_TO_RGB : MATRIX_YCC_TO_RGB;
 		dp_gen_cfg->conv_matrix_en = 1;
 	} else if (((format_src & GE2D_FORMAT_YUV) == 0) &&
 		   (format_dst & GE2D_FORMAT_YUV)) {
 		dp_gen_cfg->use_matrix_default =
-			(format_dst & GE2D_FORMAT_COMP_RANGE) ?
-			MATRIX_RGB_TO_YCC : MATRIX_RGB_TO_FULL_RANGE_YCC;
+			(format_dst & GE2D_FORMAT_FULL_RANGE) ?
+			MATRIX_RGB_TO_FULL_RANGE_YCC : MATRIX_RGB_TO_YCC;
+		dp_gen_cfg->use_matrix_default |=
+			((format_dst & GE2D_FORMAT_BT_STANDARD) ?
+				MATRIX_BT_709 : MATRIX_BT_601);
 		dp_gen_cfg->conv_matrix_en = 1;
 	} else
 		dp_gen_cfg->conv_matrix_en = 0;
+
+	y_yc_ratio = (format_dst >> 0) & 1;
 
 	/* #if MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON6 */
 	/* for dest is nv21 or nv12 in m6. */
@@ -119,7 +129,10 @@ static inline void _set_dst_format(
 		src2_dst_data_cfg->dst_format = 0;
 		src2_dst_data_cfg->dst_mode_8b_sel = 0;
 		src2_dst_data_cfg->dst2_pixel_byte_width = 1;
-		src2_dst_data_cfg->dst2_discard_mode = 0xf;
+		if (y_yc_ratio == 0)
+			src2_dst_data_cfg->dst2_discard_mode = 0xc;
+		else
+			src2_dst_data_cfg->dst2_discard_mode = 0xf;
 		src2_dst_data_cfg->dst2_enable = 1;
 		src2_dst_data_cfg->dst2_color_map =
 			src2_dst_data_cfg->dst_color_map - 5;
@@ -416,4 +429,12 @@ void ge2dgen_const_color(struct ge2d_context_s *wq,
 		dp_gen_cfg->alu_const_color = color;
 		wq->config.update_flag |= UPDATE_DP_GEN;
 	}
+}
+
+void ge2dgen_disable_matrix(struct ge2d_context_s *wq)
+{
+	struct ge2d_dp_gen_s *dp_gen_cfg = ge2d_wq_get_dp_gen(wq);
+
+	dp_gen_cfg->conv_matrix_en = 0;
+	wq->config.update_flag |= UPDATE_DP_GEN;
 }

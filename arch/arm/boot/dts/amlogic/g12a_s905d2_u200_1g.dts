@@ -23,6 +23,7 @@
 
 / {
 	model = "Amlogic";
+	amlogic-dt-id = "g12a_u200_1g";
 	compatible = "amlogic, g12a";
 	interrupt-parent = <&gic>;
 	#address-cells = <1>;
@@ -58,8 +59,7 @@
 			reg = <0x07400000 0x00100000>;
 			record-size = <0x8000>;
 			console-size = <0x8000>;
-			ftrace-size = <0x0>;
-			pmsg-size = <0x8000>;
+			ftrace-size = <0x40000>;
 		};
 
 		secmon_reserved:linux,secmon {
@@ -155,6 +155,12 @@
 			alignment = <0x400000>;
 			alloc-ranges = <0x0 0x30000000>;
 		};
+		vm0_cma_reserved:linux,vm0_cma {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x2000000>;
+			alignment = <0x400000>;
+		};
 	};
 
 	gpioleds {
@@ -165,8 +171,6 @@
 			label="sys_led";
 			gpios=<&gpio_ao GPIOAO_11 GPIO_ACTIVE_HIGH>;
 			default-state ="on";
-			retain-state-suspended;
-			linux,default-trigger="cpu0";
 		};
 	};
 
@@ -245,10 +249,25 @@
 		};
 	};
 
+	picdec_cma_reserved:linux,picdec {
+		compatible = "shared-dma-pool";
+		reusable;
+		size = <0x0>;
+		alignment = <0x0>;
+		linux,contiguous-region;
+	};
+
 	codec_mm {
 		compatible = "amlogic, codec, mm";
 		memory-region = <&codec_mm_cma &codec_mm_reserved>;
 		dev_name = "codec_mm";
+		status = "okay";
+	};
+
+	picdec {
+		compatible = "amlogic, picdec";
+		memory-region = <&picdec_cma_reserved>;
+		dev_name = "picdec";
 		status = "okay";
 	};
 
@@ -289,6 +308,71 @@
 		status = "okay";
 	};
 
+	amlvideo2_0 {
+		compatible = "amlogic, amlvideo2";
+		dev_name = "amlvideo2";
+		status = "okay";
+		amlvideo2_id = <0>;
+		cma_mode = <1>;
+	};
+
+	amlvideo2_1 {
+		compatible = "amlogic, amlvideo2";
+		dev_name = "amlvideo2";
+		status = "okay";
+		amlvideo2_id = <1>;
+		cma_mode = <1>;
+	};
+
+	vm0 {
+		compatible = "amlogic, vm";
+		memory-region = <&vm0_cma_reserved>;
+		dev_name = "vm0";
+		status = "disabled";
+		vm_id = <0>;
+	};
+
+	amvdec_656in {
+		/*bt656 gpio conflict with i2c0*/
+		compatible = "amlogic, amvdec_656in";
+		dev_name = "amvdec_656in";
+		status = "disabled";
+		reg = <0xffe02000 0x7c>;
+		clocks = <&clkc CLKID_BT656_COMP>,
+		      <&clkc CLKID_BT656>;
+		clock-names = "cts_bt656_clk1",
+		      "clk_gate_bt656";
+		/* bt656in1, bt656in2 */
+		bt656in1 {
+		bt656_id = <1>;
+		status = "disabled";
+		};
+	};
+
+	aml_cams {
+		compatible = "amlogic, cams_prober";
+		status = "disabled";
+		pinctrl-names="default";
+		pinctrl-0=<&cam_dvp_pins &gen_clk_ee_z>;
+		clocks = <&clkc CLKID_GEN_CLK>;
+		clock-names = "g12a_24m";
+		cam_0{
+			cam_name = "gc2145";
+			front_back = <0>;
+			/*u200 i2c2 gpio conflict with ethmac*/
+			camera-i2c-bus = <&i2c2>;
+			gpio_pwdn-gpios = <&gpio GPIOZ_2 GPIO_ACTIVE_HIGH>;
+			gpio_rst-gpios = <&gpio GPIOZ_12 GPIO_ACTIVE_HIGH>;
+			mirror_flip = <1>;
+			vertical_flip = <1>;
+			spread_spectrum = <0>;
+			bt_path = "gpio";
+			bt_path_count = <1>;
+			vdin_path = <0>;
+			status = "okay";
+		};
+	};
+
 	gpio_keypad{
 		compatible = "amlogic, gpio_keypad";
 		status = "okay";
@@ -316,7 +400,7 @@
 	unifykey{
 		compatible = "amlogic, unifykey";
 		status = "ok";
-		unifykey-num = <17>;
+		unifykey-num = <18>;
 		unifykey-index-0 = <&keysn_0>;
 		unifykey-index-1 = <&keysn_1>;
 		unifykey-index-2 = <&keysn_2>;
@@ -334,6 +418,7 @@
 		unifykey-index-14= <&keysn_14>;
 		unifykey-index-15= <&keysn_15>;
 		unifykey-index-16= <&keysn_16>;
+		unifykey-index-17= <&keysn_17>;
 
 		keysn_0: key_0{
 			key-name = "usid";
@@ -420,6 +505,11 @@
 		};
 		keysn_16:key_16{
 			key-name = "netflix_mgkid";
+			key-device = "secure";
+			key-permit = "read","write","del";
+		};
+		keysn_17:key_17{
+			key-name = "attestationdevidbox";// attest dev id box
 			key-device = "secure";
 			key-permit = "read","write","del";
 		};
@@ -510,7 +600,6 @@
 		compatible = "amlogic, g12a-sound-card";
 		aml-audio-card,name = "AML-AUGESOUND";
 
-		aml-audio-card,loopback = <&aml_loopback>;
 		aml-audio-card,aux-devs = <&amlogic_codec>;
 		/*avout mute gpio*/
 		avout_mute-gpios = <&gpio_ao GPIOAO_2 GPIO_ACTIVE_HIGH>;
@@ -640,7 +729,7 @@
 			/* suffix-name, sync with android audio hal
 			 * what's the dai link used for
 			 */
-			suffix-name = "alsaPORT-spdifb2hdmi";
+			suffix-name = "alsaPORT-spdifb";
 			cpu {
 				sound-dai = <&aml_spdif_b>;
 				system-clock-frequency = <6144000>;
@@ -649,6 +738,20 @@
 				sound-dai = <&dummy_codec>;
 			};
 		};
+
+		aml-audio-card,dai-link@6 {
+			mclk-fs = <256>;
+			continuous-clock;
+			suffix-name = "alsaPORT-loopback";
+			cpu {
+				sound-dai = <&loopback>;
+				system-clock-frequency = <12288000>;
+			};
+			codec {
+				sound-dai = <&dummy_codec>;
+			};
+		};
+
 		/*
 		 * dai link for i2s to hdmix,
 		 * Notice to select a tdm lane not used by hw
@@ -758,7 +861,7 @@
 	status = "okay";
 	display_size_default = <1920 1080 1920 2160 32>;
 	mem_size = <0x00800000 0x1980000 0x100000 0x100000 0x800000>;
-	logo_addr = "0x7f800000";
+	logo_addr = "0x3f800000";
 	mem_alloc = <0>;
 	pxp_mode = <0>; /** 0:normal mode 1:pxp mode */
 };
@@ -791,6 +894,13 @@
 		y_max = <1024>;
 		max-touch-number = <10>;
 	};
+};
+
+&i2c2 {
+	status = "disabled";
+	pinctrl-names="default";
+	pinctrl-0=<&i2c2_master_pins2>;
+	clock-frequency = <100000>;
 };
 
 &i2c3 {
@@ -854,10 +964,13 @@
 		dai-tdm-clk-sel = <1>;
 		clocks = <&clkaudio CLKID_AUDIO_MCLK_B
 				&clkc CLKID_MPLL1
-				&clkc CLKID_MPLL0>;
-		clock-names = "mclk", "clk_srcpll", "samesource_sysclk";
+				&clkc CLKID_MPLL0
+				&clkaudio CLKID_AUDIO_SPDIFOUT_CTRL>;
+		clock-names = "mclk", "clk_srcpll",
+			"samesource_srcpll", "samesource_clk";
 		pinctrl-names = "tdm_pins";
 		pinctrl-0 = <&tdmb_mclk &tdmout_b &tdmin_b>;
+		mclk_pad = <0>;  /* 0: mclk_0; 1: mclk_1 */
 		/*
 		 * 0: tdmout_a;
 		 * 1: tdmout_b;
@@ -881,6 +994,30 @@
 		clock-names = "mclk", "clk_srcpll";
 		pinctrl-names = "tdm_pins";
 		pinctrl-0 = <&tdmc_mclk &tdmout_c &tdmin_c>;
+		mclk_pad = <1>;  /* 0: mclk_0; 1: mclk_1 */
+	};
+
+
+	tdmlb: tdm@3 {
+		compatible = "amlogic, g12a-snd-tdmlb";
+		#sound-dai-cells = <0>;
+		dai-tdm-lane-lb-slot-mask-in = <1 0 0 0>;
+		dai-tdm-clk-sel = <1>;
+		clocks = <&clkaudio CLKID_AUDIO_MCLK_B
+				&clkc CLKID_MPLL1>;
+		clock-names = "mclk", "clk_srcpll";
+		/*
+		 * select tdmin_lb src;
+		 *0: TDMOUTA
+		 *1: TDMOUTB
+		 *2: TDMOUTC
+		 *3: PAD_TDMINA
+		 *4: PAD_TDMINB
+		 *5: PAD_TDMINC
+		 */
+		lb-src-sel = <1>;
+
+		status = "disabled";
 	};
 
 	/* copy a useless tdm to output for hdmi, no pinmux */
@@ -913,8 +1050,10 @@
 				<GIC_SPI 151 IRQ_TYPE_EDGE_RISING>;
 
 		interrupt-names = "irq_spdifin";
-		pinctrl-names = "spdif_pins";
+		pinctrl-names = "spdif_pins",
+					"spdif_pins_mute";
 		pinctrl-0 = <&spdifout &spdifin>;
+		pinctrl-1 = <&spdifout_a_mute>;
 		status = "okay";
 	};
 	aml_spdif_b: spdif_b {
@@ -945,13 +1084,25 @@
 		filter_mode = <1>; /* mode 0~4, defalut:1 */
 		status = "okay";
 	};
-	aml_loopback: loopback {
-		compatible = "amlogic, snd-loopback";
-		/*
-		 * 0: out rate = in data rate;
-		 * 1: out rate = loopback data rate;
-		 */
-		lb_mode = <0>;
+
+	loopback:loopback@0 {
+		compatible = "amlogic, g12a-loopback";
+		#sound-dai-cells = <0>;
+
+		clocks = <&clkaudio CLKID_AUDIO_PDM
+			&clkc CLKID_FCLK_DIV3
+			&clkc CLKID_MPLL3
+			&clkaudio CLKID_AUDIO_PDMIN0
+			&clkaudio CLKID_AUDIO_PDMIN1
+			&clkc CLKID_MPLL0
+			&clkaudio CLKID_AUDIO_MCLK_A>;
+		clock-names = "pdm_gate",
+			"pdm_sysclk_srcpll",
+			"pdm_dclk_srcpll",
+			"pdm_dclk",
+			"pdm_sysclk",
+			"tdminlb_mpll",
+			"tdminlb_mclk";
 
 		/* datain src
 		 * 0: tdmin_a;
@@ -961,20 +1112,30 @@
 		 * 4: pdmin;
 		 */
 		datain_src = <4>;
-		datain_chnum = <8>;
-		datain_chmask = <0x3f>;
+		datain_chnum = <4>;
+		datain_chmask = <0xf>;
+		/* config which data pin for loopback */
+		datain-lane-mask-in = <1 0 1 0>;
+
+		/* calc mclk for datalb */
+		mclk-fs = <256>;
 
 		/* tdmin_lb src
 		 * 0: tdmoutA
 		 * 1: tdmoutB
 		 * 2: tdmoutC
-		 * 3: PAD_tdminA
-		 * 4: PAD_tdminB
-		 * 5: PAD_tdminC
+		 * 3: PAD_TDMINA_DIN*, refer to core pinmux
+		 * 4: PAD_TDMINB_DIN*, refer to core pinmux
+		 * 5: PAD_TDMINC_DIN*, refer to core pinmux
+		 * 6: PAD_TDMINA_D*, oe, refer to core pinmux
+		 * 7: PAD_TDMINB_D*, oe, refer to core pinmux
 		 */
-		datalb_src = <2>;
-		datalb_chnum = <8>;
+		/* if tdmin_lb >= 3, use external loopback */
+		datalb_src = <1>;
+		datalb_chnum = <2>;
 		datalb_chmask = <0x3>;
+		/* config which data pin as loopback */
+		datalb-lane-mask-in = <1 0 0 0>;
 
 		status = "okay";
 	};
@@ -1128,6 +1289,32 @@
 		};
 	};
 
+	clk12_24_z_pins:clk12_24_z_pins {
+		mux {
+			groups = "clk12_24_z";
+			function = "clk12_24_ee";
+			drive-strength = <3>;
+		};
+	};
+
+	gen_clk_ee_z: gen_clk_ee_z {
+		mux {
+			groups="gen_clk_ee_z";
+			function="gen_clk_ee";
+			drive-strength = <3>;
+		};
+	};
+
+	cam_dvp_pins:cam_dvp_pins {
+		mux {
+			groups = "bt656_a_vs", "bt656_a_hs", "bt656_a_clk",
+				"bt656_a_din0", "bt656_a_din1", "bt656_a_din2",
+				"bt656_a_din3", "bt656_a_din4", "bt656_a_din5",
+				"bt656_a_din6", "bt656_a_din7";
+			function = "bt656";
+		};
+	};
+
 
 }; /* end of pinctrl_periphs */
 &pinctrl_aobus {
@@ -1135,6 +1322,13 @@
 		mux { /* gpiao_10 */
 			groups = "spdif_out_ao";
 			function = "spdif_out_ao";
+		};
+	};
+
+	spdifout_a_mute: spdifout_a_mute {
+		mux { /* gpiao_10 */
+			groups = "GPIOAO_10";
+			function = "gpio_aobus";
 		};
 	};
 };  /* end of pinctrl_aobus */

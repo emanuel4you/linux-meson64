@@ -60,6 +60,42 @@ enum scpi_error_codes {
 	SCPI_ERR_MAX
 };
 
+static int scpi_freq_map_table[] = {
+	0,
+	0,
+	1200,
+	1300,
+	1400,
+	1500,
+	1600,
+	1700,
+	1800,
+	1900,
+	2000,
+	2100,
+	2200,
+	2300,
+	2400,
+	0
+};
+static int scpi_volt_map_table[] = {
+	0,
+	0,
+	900,
+	910,
+	920,
+	930,
+	940,
+	950,
+	960,
+	970,
+	980,
+	990,
+	1000,
+	1010,
+	1020,
+	0
+};
 
 struct scpi_data_buf {
 	int client_id;
@@ -84,7 +120,10 @@ static int high_priority_cmds[] = {
 	SCPI_CMD_SENSOR_CFG_BOUNDS,
 	SCPI_CMD_WAKEUP_REASON_GET,
 	SCPI_CMD_WAKEUP_REASON_CLR,
+	SCPI_CMD_INIT_DSP,
 };
+
+static int m4_cmds[] = {-1};
 
 static struct scpi_dvfs_info *scpi_opps[MAX_DVFS_DOMAINS];
 
@@ -103,11 +142,17 @@ static inline int scpi_to_linux_errno(int errno)
 
 static bool high_priority_chan_supported(int cmd)
 {
-	int idx;
+	unsigned int idx;
 
-	for (idx = 0; idx < ARRAY_SIZE(high_priority_cmds); idx++)
-		if (cmd == high_priority_cmds[idx])
-			return true;
+	if (num_scp_chans == CHANNEL_MAX) {
+		for (idx = 0; idx < ARRAY_SIZE(high_priority_cmds); idx++)
+			if (cmd == high_priority_cmds[idx])
+				return true;
+	} else {
+		for (idx = 0; idx < ARRAY_SIZE(m4_cmds); idx++)
+			if (cmd == m4_cmds[idx])
+				return true;
+	}
 	return false;
 }
 
@@ -520,6 +565,29 @@ int scpi_clr_wakeup_reason(void)
 }
 EXPORT_SYMBOL_GPL(scpi_clr_wakeup_reason);
 
+int scpi_init_dsp_cfg0(u32 id, u32 addr, u32 cfg0)
+{
+	struct scpi_data_buf sdata;
+	struct mhu_data_buf mdata;
+	u32 temp = 0;
+	struct __packed {
+		u32 id;
+		u32 addr;
+		u32 cfg0;
+	} buf;
+	buf.id = id;
+	buf.addr = addr;
+	buf.cfg0 = cfg0;
+
+	SCPI_SETUP_DBUF(sdata, mdata, SCPI_CL_NONE,
+			SCPI_CMD_INIT_DSP, buf, temp);
+	if (scpi_execute_cmd(&sdata))
+		return -EPERM;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(scpi_init_dsp_cfg0);
+
 int scpi_get_cec_val(enum scpi_std_cmd index, u32 *p_cec)
 {
 	struct scpi_data_buf sdata;
@@ -555,7 +623,77 @@ u8 scpi_get_ethernet_calc(void)
 	SCPI_SETUP_DBUF(sdata, mdata, SCPI_CL_NONE,
 		SCPI_CMD_GET_ETHERNET_CALC, temp, buf);
 	if (scpi_execute_cmd(&sdata))
-		return -EPERM;
+		return 0;
 	return buf.eth_calc;
 }
 EXPORT_SYMBOL_GPL(scpi_get_ethernet_calc);
+
+int scpi_get_cpuinfo(enum scpi_get_pfm_type type, u32 *freq, u32 *vol)
+{
+	struct scpi_data_buf sdata;
+	struct mhu_data_buf mdata;
+	u8 index = 0;
+	int ret;
+
+	struct __packed {
+		u32 status;
+		u8 pfm_info[4];
+	} buf;
+
+	SCPI_SETUP_DBUF(sdata, mdata, SCPI_CL_NONE,
+		SCPI_CMD_GET_CPUINFO, index, buf);
+	if (scpi_execute_cmd(&sdata))
+		return -EPERM;
+
+	switch (type) {
+	case SCPI_CPUINFO_VERSION:
+		ret = buf.pfm_info[0];
+		break;
+	case SCPI_CPUINFO_CLUSTER0:
+		index = (buf.pfm_info[1] >> 4) & 0xf;
+		*freq = scpi_freq_map_table[index];
+		index = buf.pfm_info[1] & 0xf;
+		*vol = scpi_volt_map_table[index];
+		ret = 0;
+		break;
+	case SCPI_CPUINFO_CLUSTER1:
+		index = (buf.pfm_info[2] >> 4) & 0xf;
+		*freq = scpi_freq_map_table[index];
+		index = buf.pfm_info[2] & 0xf;
+		*vol = scpi_volt_map_table[index];
+		ret = 0;
+		break;
+	case SCPI_CPUINFO_SLT:
+		index = (buf.pfm_info[3] >> 4) & 0xf;
+		*freq = scpi_freq_map_table[index];
+		index = buf.pfm_info[3] & 0xf;
+		*vol = scpi_volt_map_table[index];
+		ret = 0;
+		break;
+	default:
+		*freq = 0;
+		*vol = 0;
+		ret = -1;
+		break;
+	};
+	return ret;
+}
+EXPORT_SYMBOL_GPL(scpi_get_cpuinfo);
+
+int scpi_unlock_bl40(void)
+{
+	struct scpi_data_buf sdata;
+	struct mhu_data_buf mdata;
+	u8 temp = 0;
+
+	struct __packed {
+		u32 status;
+	} buf;
+
+	SCPI_SETUP_DBUF(sdata, mdata, SCPI_CL_NONE,
+			SCPI_CMD_BL4_WAIT_UNLOCK, temp, buf);
+	if (scpi_execute_cmd(&sdata))
+		return -1;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(scpi_unlock_bl40);

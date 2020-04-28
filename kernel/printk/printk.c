@@ -612,7 +612,7 @@ static int syslog_action_restricted(int type)
 	       type != SYSLOG_ACTION_SIZE_BUFFER;
 }
 
-int check_syslog_permissions(int type, int source)
+static int check_syslog_permissions(int type, int source)
 {
 	/*
 	 * If this is from /proc/kmsg and we've already opened it, then we've
@@ -640,7 +640,6 @@ int check_syslog_permissions(int type, int source)
 ok:
 	return security_syslog(type);
 }
-EXPORT_SYMBOL_GPL(check_syslog_permissions);
 
 static void append_char(char **pp, char *e, char c)
 {
@@ -1191,7 +1190,11 @@ static size_t print_time(u64 ts, char *buf)
 	rem_nsec = do_div(ts, 1000000000);
 
 	if (!buf)
+#ifdef CONFIG_AMLOGIC_MODIFY
+		return snprintf(NULL, 0, "[%5lu.000000@0] ", (unsigned long)ts);
+#else
 		return snprintf(NULL, 0, "[%5lu.000000] ", (unsigned long)ts);
+#endif
 
 #if defined(CONFIG_SMP) && defined(CONFIG_AMLOGIC_DRIVER)
 	return sprintf(buf, "[%5lu.%06lu@%d] ",

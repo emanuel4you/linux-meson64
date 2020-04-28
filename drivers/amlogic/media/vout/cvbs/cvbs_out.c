@@ -130,6 +130,24 @@ static struct vinfo_s cvbs_info[] = {
 		.viu_mux           = VIU_MUX_ENCI,
 		.vout_device       = NULL,
 	},
+	{ /* MODE_NTSC_M */
+		.name              = "ntsc_m",
+		.mode              = VMODE_CVBS,
+		.width             = 720,
+		.height            = 480,
+		.field_height      = 240,
+		.aspect_ratio_num  = 4,
+		.aspect_ratio_den  = 3,
+		.sync_duration_num = 60,
+		.sync_duration_den = 1,
+		.video_clk         = 27000000,
+		.htotal            = 1716,
+		.vtotal            = 525,
+		.fr_adj_type       = VOUT_FR_ADJ_NONE,
+		.viu_color_fmt     = COLOR_FMT_YUV444,
+		.viu_mux           = VIU_MUX_ENCI,
+		.vout_device       = NULL,
+	},
 };
 
 /*bit[0]: 0=vid_pll, 1=gp0_pll*/
@@ -231,7 +249,7 @@ static void cvbs_cntl_output(unsigned int open)
 		vdac_set_ctrl0_ctrl1(cntl0, cntl1);
 
 		/* must enable adc bandgap, the adc ref signal for demod */
-		vdac_enable(0, 0x8);
+		vdac_enable(0, VDAC_MODULE_CVBS_OUT);
 	} else if (open == 1) { /* open */
 
 		cntl0 = info->cvbs_data->cntl0_val;
@@ -241,7 +259,7 @@ static void cvbs_cntl_output(unsigned int open)
 		vdac_set_ctrl0_ctrl1(cntl0, cntl1);
 
 		/*vdac ctrl for cvbsout/rf signal,adc bandgap*/
-		vdac_enable(1, 0x8);
+		vdac_enable(1, VDAC_MODULE_CVBS_OUT);
 	}
 }
 
@@ -411,6 +429,9 @@ int cvbs_out_setmode(void)
 		break;
 	case MODE_PAL_N:
 		cvbs_log_info("SET cvbs mode: pal_n\n");
+		break;
+	case MODE_NTSC_M:
+		cvbs_log_info("SET cvbs mode: ntsc_m\n");
 		break;
 	default:
 		cvbs_log_err("cvbs_out_setmode:invalid cvbs mode");
@@ -902,17 +923,13 @@ static void cvbs_performance_regs_dump(void)
 		pr_info("vcbus [0x%x] = 0x%x\n", performance_regs_enci[i],
 			cvbs_out_reg_read(performance_regs_enci[i]));
 	}
-	if (cvbs_cpu_type() == CVBS_CPU_TYPE_G12A ||
-		cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
-		cvbs_cpu_type() == CVBS_CPU_TYPE_TL1)
+	if (cvbs_cpu_type() >= CVBS_CPU_TYPE_G12A)
 		size = sizeof(performance_regs_vdac_g12a)/sizeof(unsigned int);
 	else
 		size = sizeof(performance_regs_vdac)/sizeof(unsigned int);
 	pr_info("------------------------\n");
 	for (i = 0; i < size; i++) {
-		if (cvbs_cpu_type() == CVBS_CPU_TYPE_G12A ||
-			cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
-			cvbs_cpu_type() == CVBS_CPU_TYPE_TL1)
+		if (cvbs_cpu_type() >= CVBS_CPU_TYPE_G12A)
 			pr_info("hiu [0x%x] = 0x%x\n",
 			performance_regs_vdac_g12a[i],
 			cvbs_out_hiu_read(performance_regs_vdac_g12a[i]));
@@ -1209,9 +1226,7 @@ static void cvbs_debug_store(char *buf)
 		cvbs_performance_config_dump();
 		break;
 	case CMD_VP_SET_PLLPATH:
-		if (cvbs_cpu_type() != CVBS_CPU_TYPE_G12A &&
-			cvbs_cpu_type() != CVBS_CPU_TYPE_G12B &&
-			cvbs_cpu_type() != CVBS_CPU_TYPE_TL1) {
+		if (cvbs_cpu_type() < CVBS_CPU_TYPE_G12A) {
 			print_info("ERR:Only after g12a/b chip supported\n");
 			break;
 		}
@@ -1457,6 +1472,18 @@ struct meson_cvbsout_data meson_tl1_cvbsout_data = {
 	.name = "meson-tl1-cvbsout",
 };
 
+struct meson_cvbsout_data meson_sm1_cvbsout_data = {
+	.cntl0_val = 0x8f6001,
+	.cpu_id = CVBS_CPU_TYPE_SM1,
+	.name = "meson-sm1-cvbsout",
+};
+
+struct meson_cvbsout_data meson_tm2_cvbsout_data = {
+	.cntl0_val = 0x906001,
+	.cpu_id = CVBS_CPU_TYPE_TM2,
+	.name = "meson-tm2-cvbsout",
+};
+
 static const struct of_device_id meson_cvbsout_dt_match[] = {
 	{
 		.compatible = "amlogic, cvbsout-gxl",
@@ -1476,6 +1503,12 @@ static const struct of_device_id meson_cvbsout_dt_match[] = {
 	}, {
 		.compatible = "amlogic, cvbsout-tl1",
 		.data		= &meson_tl1_cvbsout_data,
+	}, {
+		.compatible = "amlogic, cvbsout-sm1",
+		.data		= &meson_sm1_cvbsout_data,
+	}, {
+		.compatible = "amlogic, cvbsout-tm2",
+		.data		= &meson_tm2_cvbsout_data,
 	},
 	{},
 };

@@ -49,9 +49,9 @@
 #include <asm/mpu.h>
 
 #ifdef CONFIG_AMLOGIC_MODIFY
-#include <asm/perf_event.h>
+#include <asm/cp15.h>
+#define MIDR		__ACCESS_CP15(c0, 0, c0, 0)
 #endif
-
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
 
@@ -76,9 +76,6 @@ enum ipi_msg_type {
 	IPI_CPU_STOP,
 	IPI_IRQ_WORK,
 	IPI_COMPLETION,
-	#ifdef CONFIG_AMLOGIC_MODIFY
-	IPI_AML_PMU,
-	#endif
 	IPI_CPU_BACKTRACE,
 	/*
 	 * SGI8-15 can be reserved by secure firmware, and thus may
@@ -333,11 +330,20 @@ void arch_cpu_idle_dead(void)
 	 * cpu initialisation.  There's some initialisation which needs
 	 * to be repeated to undo the effects of taking the CPU offline.
 	 */
+#ifdef CONFIG_AMLOGIC_VMAP
+	__asm__("mov	sp, %0\n"
+	"	mov	fp, #0\n"
+	"	b	secondary_start_kernel"
+		:
+		: "r" (task_stack_page(current) + THREAD_SIZE - 8 -
+		       THREAD_INFO_SIZE));
+#else
 	__asm__("mov	sp, %0\n"
 	"	mov	fp, #0\n"
 	"	b	secondary_start_kernel"
 		:
 		: "r" (task_stack_page(current) + THREAD_SIZE - 8));
+#endif
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
@@ -489,9 +495,6 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
 	S(IPI_CPU_STOP, "CPU stop interrupts"),
 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
 	S(IPI_COMPLETION, "completion interrupts"),
-#ifdef CONFIG_AMLOGIC_MODIFY
-	S(IPI_AML_PMU, "AML pmu cross interrupts"),
-#endif
 };
 
 static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
@@ -499,13 +502,6 @@ static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
 	trace_ipi_raise_rcuidle(target, ipi_types[ipinr]);
 	__smp_cross_call(target, ipinr);
 }
-
-#ifdef CONFIG_AMLOGIC_MODIFY
-void smp_send_aml_pmu(int cpu)
-{
-	smp_cross_call(cpumask_of(cpu), IPI_AML_PMU);
-}
-#endif
 
 void show_ipi_list(struct seq_file *p, int prec)
 {
@@ -583,6 +579,19 @@ static void ipi_cpu_stop(unsigned int cpu)
 	local_fiq_disable();
 	local_irq_disable();
 
+#ifdef CONFIG_AMLOGIC_MODIFY
+/* CORTEX-A55 need power down here for shutdown*/
+/* If A55 enter WFI here, it is possible quit from wfi,
+ *  which cause CPU PACTIVE check fail.
+ */
+#ifdef CONFIG_HOTPLUG_CPU
+	if (((read_cpuid_id() >> 4) & 0xFFF) == 0xD05) {
+		flush_cache_louis();
+		if (smp_ops.cpu_die)
+			smp_ops.cpu_die(cpu);
+	}
+#endif
+#endif
 	while (1)
 		cpu_relax();
 }
@@ -667,12 +676,6 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		irq_exit();
 		printk_nmi_exit();
 		break;
-
-#ifdef CONFIG_AMLOGIC_MODIFY
-	case IPI_AML_PMU:
-		armv8pmu_handle_irq_ipi();
-		break;
-#endif
 
 	default:
 		pr_crit("CPU%u: Unknown IPI message 0x%x\n",

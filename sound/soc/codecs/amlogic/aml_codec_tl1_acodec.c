@@ -57,6 +57,7 @@ struct tl1_acodec_priv {
 	struct snd_soc_codec *codec;
 	struct snd_pcm_hw_params *params;
 	struct regmap *regmap;
+	struct work_struct work;
 	struct tl1_acodec_chipinfo *chipinfo;
 	int tdmout_index;
 	int dat0_ch_sel;
@@ -354,10 +355,10 @@ static const struct snd_soc_dapm_widget tl1_acodec_dapm_widgets[] = {
 			 0, 0, &lir_mux),
 
 	/*ADC capture stream */
-	SND_SOC_DAPM_ADC("Left ADC", "Capture", ACODEC_0,
-			 ADCL_EN, 0),
-	SND_SOC_DAPM_ADC("Right ADC", "Capture", ACODEC_0,
-			 ADCR_EN, 0),
+	SND_SOC_DAPM_ADC("Left ADC", "Capture", SND_SOC_NOPM,
+			 0, 0),
+	SND_SOC_DAPM_ADC("Right ADC", "Capture", SND_SOC_NOPM,
+			 0, 0),
 
 	/*Output */
 	SND_SOC_DAPM_OUTPUT("Lineout 1 left"),
@@ -367,19 +368,19 @@ static const struct snd_soc_dapm_widget tl1_acodec_dapm_widgets[] = {
 
 	/*DAC playback stream */
 	SND_SOC_DAPM_DAC("Left DAC", "Playback",
-			ACODEC_0,
-			DACL_EN, 0),
+			SND_SOC_NOPM,
+			0, 0),
 	SND_SOC_DAPM_DAC("Right DAC", "Playback",
-			ACODEC_0,
-			DACR_EN, 0),
+			SND_SOC_NOPM,
+			0, 0),
 
 	/*DAC 2 playback stream */
 	SND_SOC_DAPM_DAC("Left DAC2", "Playback",
-			ACODEC_5,
-			DAC2L_EN, 0),
+			SND_SOC_NOPM,
+			0, 0),
 	SND_SOC_DAPM_DAC("Right DAC2", "Playback",
-			ACODEC_5,
-			DAC2R_EN, 0),
+			SND_SOC_NOPM,
+			0, 0),
 
 	/*DRV output */
 	SND_SOC_DAPM_OUT_DRV("LO1L_OUT_EN", ACODEC_0,
@@ -482,8 +483,7 @@ static int tl1_acodec_dai_hw_params(struct snd_pcm_substream *substream,
 			      struct snd_pcm_hw_params *params,
 			      struct snd_soc_dai *dai)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_codec *codec = rtd->codec;
+	struct snd_soc_codec *codec = dai->codec;
 	struct tl1_acodec_priv *aml_acodec =
 	    snd_soc_codec_get_drvdata(codec);
 
@@ -550,6 +550,34 @@ static int tl1_acodec_start_up(struct snd_soc_codec *codec)
 	return 0;
 }
 
+static void tl1_acodec_release_fast_mode_work_func(struct work_struct *p_work)
+{
+	struct tl1_acodec_priv *aml_acodec;
+	struct snd_soc_codec *codec;
+
+	aml_acodec = container_of(
+				p_work, struct tl1_acodec_priv, work);
+	if (!aml_acodec) {
+		pr_err("%s, Get tl1_acodec_priv fail\n", __func__);
+		return;
+	}
+
+	codec = aml_acodec->codec;
+	if (!codec) {
+		pr_err("%s, Get snd_soc_codec fail\n", __func__);
+		return;
+	}
+
+	pr_info("%s\n", __func__);
+	/*reset audio codec register*/
+	tl1_acodec_reset(codec);
+	tl1_acodec_start_up(codec);
+	tl1_acodec_reg_init(codec);
+
+	aml_acodec->codec = codec;
+	tl1_acodec_dai_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+}
+
 static int tl1_acodec_dai_mute_stream(struct snd_soc_dai *dai, int mute,
 				      int stream)
 {
@@ -605,25 +633,23 @@ static int tl1_acodec_probe(struct snd_soc_codec *codec)
 		snd_soc_codec_get_drvdata(codec);
 
 	if (!aml_acodec) {
-		pr_err("Failed to get tl1 acodec pri\n");
+		pr_err("Failed to get tl1 acodec priv\n");
 		return -EINVAL;
 	}
-
-	/*reset audio codec register*/
-	tl1_acodec_reset(codec);
-	tl1_acodec_start_up(codec);
-	tl1_acodec_reg_init(codec);
-
 	aml_acodec->codec = codec;
-	tl1_acodec_dai_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+	INIT_WORK(&aml_acodec->work, tl1_acodec_release_fast_mode_work_func);
+	schedule_work(&aml_acodec->work);
+
 	pr_info("%s\n", __func__);
 	return 0;
 }
 
 static int tl1_acodec_remove(struct snd_soc_codec *codec)
 {
+	struct tl1_acodec_priv *aml_acodec =
+		snd_soc_codec_get_drvdata(codec);
 	pr_info("%s!\n", __func__);
-
+	cancel_work_sync(&aml_acodec->work);
 	tl1_acodec_dai_set_bias_level(codec, SND_SOC_BIAS_OFF);
 
 	return 0;
@@ -672,8 +698,7 @@ static const struct regmap_config tl1_acodec_regmap_config = {
 	.reg_stride = 4,
 	.val_bits = 32,
 	.max_register = 0x1c,
-	.reg_defaults = tl1_acodec_init_list,
-	.num_reg_defaults = ARRAY_SIZE(tl1_acodec_init_list),
+	.num_reg_defaults_raw = ARRAY_SIZE(tl1_acodec_init_list),
 	.cache_type = REGCACHE_RBTREE,
 };
 

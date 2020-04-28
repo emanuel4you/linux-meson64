@@ -35,7 +35,15 @@
 /* 20181012: tl1 support tcon */
 /* 20181212: tl1 update p2p config and pll setting */
 /* 20181225: update phy config */
-#define LCD_DRV_VERSION    "20181225"
+/* 20190108: tl1 support tablet mode */
+/* 20190115: tl1 tcon all interface support */
+/* 20190225: optimize unifykey read flow to avoid crash */
+/* 20190308: add more panel clk_ss_level step for tl1 */
+/* 20190520: add vbyone hw filter user define support */
+/* 20190911: add lcd_init_level for tl1 */
+/* 20191025: tcon chpi phy setting update */
+/* 20191115: tcon add demura and vac function  for tl1*/
+#define LCD_DRV_VERSION    "20191115"
 
 #define VPP_OUT_SATURATE            (1 << 0)
 
@@ -48,6 +56,8 @@ extern int lcd_type_str_to_type(const char *str);
 extern char *lcd_type_type_to_str(int type);
 extern unsigned char lcd_mode_str_to_mode(const char *str);
 extern char *lcd_mode_mode_to_str(int mode);
+extern u8 *lcd_vmap(ulong addr, u32 size);
+extern void lcd_unmap_phyaddr(u8 *vaddr);
 
 extern void lcd_cpu_gpio_probe(unsigned int index);
 extern void lcd_cpu_gpio_set(unsigned int index, int value);
@@ -68,8 +78,11 @@ extern int lcd_vlock_param_load_from_unifykey(struct lcd_config_s *pconf,
 extern void lcd_optical_vinfo_update(void);
 extern void lcd_timing_init_config(struct lcd_config_s *pconf);
 extern int lcd_vmode_change(struct lcd_config_s *pconf);
+extern void lcd_clk_change(struct lcd_config_s *pconf);
 extern void lcd_venc_change(struct lcd_config_s *pconf);
 extern void lcd_if_enable_retry(struct lcd_config_s *pconf);
+extern void lcd_vout_notify_mode_change_pre(void);
+extern void lcd_vout_notify_mode_change(void);
 
 /* lcd phy */
 extern void lcd_lvds_phy_set(struct lcd_config_s *pconf, int status);
@@ -77,6 +90,8 @@ extern void lcd_vbyone_phy_set(struct lcd_config_s *pconf, int status);
 extern void lcd_mlvds_phy_set(struct lcd_config_s *pconf, int status);
 extern void lcd_p2p_phy_set(struct lcd_config_s *pconf, int status);
 extern void lcd_mipi_phy_set(struct lcd_config_s *pconf, int status);
+int lcd_phy_probe(void);
+void lcd_phy_tcon_chpi_bbc_init_tl1(int delay);
 
 /* lcd tcon */
 extern unsigned int lcd_tcon_reg_read(unsigned int addr);

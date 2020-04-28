@@ -16,10 +16,12 @@
 
 /dts-v1/;
 
-#include "mesong12b.dtsi"
+#include "mesong12b_a.dtsi"
+#include "dreamtwo-panel.dtsi"
 
 / {
 	model = "Amlogic";
+	amlogic-dt-id = "g12b_w400_a";
 	compatible = "amlogic, g12b";
 	interrupt-parent = <&gic>;
 	#address-cells = <2>;
@@ -55,8 +57,7 @@
 			reg = <0x0 0x07400000 0x0 0x00100000>;
 			record-size = <0x8000>;
 			console-size = <0x8000>;
-			ftrace-size = <0x0>;
-			pmsg-size = <0x8000>;
+			ftrace-size = <0x40000>;
 		};
 
 		secmon_reserved:linux,secmon {
@@ -151,7 +152,7 @@
 		galcore_reserved:linux,galcore {
 			compatible = "shared-dma-pool";
 			reusable;
-			size = <0x0 0x1000000>;
+			size = <0x0 0x0>;
 			alignment = <0x0 0x400000>;
 			linux,contiguous-region;
 		};
@@ -627,7 +628,7 @@
 		compatible = "amlogic, g12a-sound-card";
 		aml-audio-card,name = "AML-AUGESOUND";
 
-		//aml-audio-card,loopback = <&aml_loopback>;
+
 		//aml-audio-card,aux-devs = <&amlogic_codec>;
 		/*avout mute gpio*/
 		avout_mute-gpios = <&gpio_ao GPIOAO_2 GPIO_ACTIVE_HIGH>;
@@ -716,46 +717,38 @@
 		opp-shared;
 
 		opp00 {
-			opp-hz = /bits/ 64 <100000000>;
-			opp-microvolt = <731000>;
-		};
-		opp01 {
-			opp-hz = /bits/ 64 <250000000>;
-			opp-microvolt = <731000>;
-		};
-		opp02 {
 			opp-hz = /bits/ 64 <500000000>;
 			opp-microvolt = <731000>;
 		};
-		opp03 {
+		opp01 {
 			opp-hz = /bits/ 64 <667000000>;
 			opp-microvolt = <731000>;
 		};
-		opp04 {
+		opp02 {
 			opp-hz = /bits/ 64 <1000000000>;
 			opp-microvolt = <731000>;
 		};
-		opp05 {
+		opp03 {
 			opp-hz = /bits/ 64 <1200000000>;
 			opp-microvolt = <731000>;
 		};
-		opp06 {
+		opp04 {
 			opp-hz = /bits/ 64 <1398000000>;
 			opp-microvolt = <761000>;
 		};
-		opp07 {
+		opp05 {
 			opp-hz = /bits/ 64 <1512000000>;
 			opp-microvolt = <791000>;
 		};
-		opp08 {
+		opp06 {
 			opp-hz = /bits/ 64 <1608000000>;
 			opp-microvolt = <831000>;
 		};
-		opp09 {
+		opp07 {
 			opp-hz = /bits/ 64 <1704000000>;
 			opp-microvolt = <861000>;
 		};
-		opp10 {
+		opp08 {
 			opp-hz = /bits/ 64 <1800000000>;
 			opp-microvolt = <981000>;
 		};
@@ -766,42 +759,34 @@
 		opp-shared;
 
 		opp00 {
-			opp-hz = /bits/ 64 <100000000>;
-			opp-microvolt = <751000>;
-		};
-		opp01 {
-			opp-hz = /bits/ 64 <250000000>;
-			opp-microvolt = <751000>;
-		};
-		opp02 {
 			opp-hz = /bits/ 64 <500000000>;
 			opp-microvolt = <751000>;
 		};
-		opp03 {
+		opp01 {
 			opp-hz = /bits/ 64 <667000000>;
 			opp-microvolt = <751000>;
 		};
-		opp04 {
+		opp02 {
 			opp-hz = /bits/ 64 <1000000000>;
 			opp-microvolt = <771000>;
 		};
-		opp05 {
+		opp03 {
 			opp-hz = /bits/ 64 <1200000000>;
 			opp-microvolt = <771000>;
 		};
-		opp06 {
+		opp04 {
 			opp-hz = /bits/ 64 <1398000000>;
 			opp-microvolt = <791000>;
 		};
-		opp07 {
+		opp05 {
 			opp-hz = /bits/ 64 <1512000000>;
 			opp-microvolt = <821000>;
 		};
-		opp08 {
+		opp06 {
 			opp-hz = /bits/ 64 <1608000000>;
 			opp-microvolt = <861000>;
 		};
-		opp09 {
+		opp07 {
 			opp-hz = /bits/ 64 <1704000000>;
 			opp-microvolt = <891000>;
 		};
@@ -815,18 +800,20 @@
 	sensor: sensor {
 		compatible = "soc, sensor";
 		status = "disabled";
-		sensor-name = "imx290"; /*imx290;os08a10;imx227*/
+		sensor-name = "imx290"; /*imx290;os08a10;imx227;imx307*/
 		pinctrl-names="default";
 		pinctrl-0=<&clk12_24_z_pins>;
 		clocks = <&clkc CLKID_24M>;
 		clock-names = "g12a_24m";
 		reset = <&gpio GPIOZ_12 GPIO_ACTIVE_HIGH>;
+		ir_cut_gpio = <&gpio GPIOZ_11 GPIO_ACTIVE_HIGH
+				&gpio GPIOZ_7 GPIO_ACTIVE_HIGH>;
 	};
 
 	iq: iq {
 		compatible = "soc, iq";
 		status = "disabled";
-		sensor-name = "imx290"; /*imx290;os08a10;imx227*/
+		sensor-name = "imx290"; /*imx290;os08a10;imx227;imx307*/
 	};
 
 	smartcard: smartcard {
@@ -944,7 +931,7 @@
 	status = "okay";
 	pinctrl-names="default";
 	pinctrl-0=<&i2c3_master_pins2>;
-	clock-frequency = <100000>; /* default 100k */
+	clock-frequency = <400000>; /* 400khz */
 
 	/* for ref board */
 	ad82584f_62: ad82584f_62@62 {
@@ -993,10 +980,13 @@
 		dai-tdm-clk-sel = <1>;
 		clocks = <&clkaudio CLKID_AUDIO_MCLK_B
 				&clkc CLKID_MPLL1
-				&clkc CLKID_MPLL0>;
-		clock-names = "mclk", "clk_srcpll", "samesource_sysclk";
+				&clkc CLKID_MPLL0
+				&clkaudio CLKID_AUDIO_SPDIFOUT_CTRL>;
+		clock-names = "mclk", "clk_srcpll",
+			"samesource_srcpll", "samesource_clk";
 		pinctrl-names = "default";
 		pinctrl-0 = <&tdmout_b &tdmin_b>;
+		mclk_pad = <0>;  /* 0: mclk_0; 1: mclk_1 */
 		/*
 		 * 0: tdmout_a;
 		 * 1: tdmout_b;
@@ -1020,21 +1010,29 @@
 		clock-names = "mclk", "clk_srcpll";
 		//pinctrl-names = "default";
 		//pinctrl-0 = <&tdmc_mclk &tdmout_c &tdmin_c>;
+		mclk_pad = <1>;  /* 0: mclk_0; 1: mclk_1 */
 	};
 
-	/* copy a useless tdm to output for hdmi, no pinmux */
-	aml_i2s2hdmi: i2s2hdmi {
-		compatible = "amlogic, g12a-snd-tdmc";
+	tdmlb: tdm@3 {
+		compatible = "amlogic, g12a-snd-tdmlb";
 		#sound-dai-cells = <0>;
-		dai-tdm-lane-slot-mask-out = <1 1 1 1>;
-		dai-tdm-clk-sel = <2>;
-		clocks = <&clkaudio CLKID_AUDIO_MCLK_C
-				&clkc CLKID_MPLL2>;
+		dai-tdm-lane-lb-slot-mask-in = <1 0 0 0>;
+		dai-tdm-clk-sel = <1>;
+		clocks = <&clkaudio CLKID_AUDIO_MCLK_B
+				&clkc CLKID_MPLL1>;
 		clock-names = "mclk", "clk_srcpll";
+		/*
+		 * select tdmin_lb src;
+		 *0: TDMOUTA
+		 *1: TDMOUTB
+		 *2: TDMOUTC
+		 *3: PAD_TDMINA
+		 *4: PAD_TDMINB
+		 *5: PAD_TDMINC
+		 */
+		lb-src-sel = <1>;
 
-		i2s2hdmi = <1>;
-
-		status = "okay";
+		status = "disabled";
 	};
 
 	aml_spdif: spdif {
@@ -1052,8 +1050,10 @@
 				<GIC_SPI 151 IRQ_TYPE_EDGE_RISING>;
 
 		interrupt-names = "irq_spdifin";
-		pinctrl-names = "default";
+		pinctrl-names = "default",
+					"spdif_pins_mute";
 		pinctrl-0 = <&spdifout>;
+		pinctrl-1 = <&spdifout_a_mute>;
 		status = "okay";
 	};
 	aml_spdif_b: spdif_b {
@@ -1084,13 +1084,25 @@
 		filter_mode = <1>; /* mode 0~4, defalut:1 */
 		status = "disabled";
 	};
-	aml_loopback: loopback {
-		compatible = "amlogic, snd-loopback";
-		/*
-		 * 0: out rate = in data rate;
-		 * 1: out rate = loopback data rate;
-		 */
-		lb_mode = <0>;
+
+	loopback:loopback@0 {
+		compatible = "amlogic, g12a-loopback";
+		#sound-dai-cells = <0>;
+
+		clocks = <&clkaudio CLKID_AUDIO_PDM
+			&clkc CLKID_FCLK_DIV3
+			&clkc CLKID_MPLL3
+			&clkaudio CLKID_AUDIO_PDMIN0
+			&clkaudio CLKID_AUDIO_PDMIN1
+			&clkc CLKID_MPLL0
+			&clkaudio CLKID_AUDIO_MCLK_A>;
+		clock-names = "pdm_gate",
+			"pdm_sysclk_srcpll",
+			"pdm_dclk_srcpll",
+			"pdm_dclk",
+			"pdm_sysclk",
+			"tdminlb_mpll",
+			"tdminlb_mclk";
 
 		/* datain src
 		 * 0: tdmin_a;
@@ -1100,20 +1112,30 @@
 		 * 4: pdmin;
 		 */
 		datain_src = <4>;
-		datain_chnum = <8>;
-		datain_chmask = <0x3f>;
+		datain_chnum = <4>;
+		datain_chmask = <0xf>;
+		/* config which data pin for loopback */
+		datain-lane-mask-in = <1 0 1 0>;
+
+		/* calc mclk for datalb */
+		mclk-fs = <256>;
 
 		/* tdmin_lb src
 		 * 0: tdmoutA
 		 * 1: tdmoutB
 		 * 2: tdmoutC
-		 * 3: PAD_tdminA
-		 * 4: PAD_tdminB
-		 * 5: PAD_tdminC
+		 * 3: PAD_TDMINA_DIN*, refer to core pinmux
+		 * 4: PAD_TDMINB_DIN*, refer to core pinmux
+		 * 5: PAD_TDMINC_DIN*, refer to core pinmux
+		 * 6: PAD_TDMINA_D*, oe, refer to core pinmux
+		 * 7: PAD_TDMINB_D*, oe, refer to core pinmux
 		 */
-		datalb_src = <2>;
-		datalb_chnum = <8>;
+		/* if tdmin_lb >= 3, use external loopback */
+		datalb_src = <1>;
+		datalb_chnum = <2>;
 		datalb_chmask = <0x3>;
+		/* config which data pin as loopback */
+		datalb-lane-mask-in = <1 0 0 0>;
 
 		status = "disabled";
 	};
@@ -1303,6 +1325,13 @@
 			function = "spdif_out_ao";
 		};
 	};
+
+	spdifout_a_mute: spdifout_a_mute {
+		mux { /* gpiao_10 */
+			groups = "GPIOAO_10";
+			function = "gpio_aobus";
+		};
+	};
 };  /* end of pinctrl_aobus */
 
 &irblaster {
@@ -1482,6 +1511,7 @@
 	pinctrl-0 = <&external_eth_pins>;
 	mc_val = <0x1621>;
 	internal_phy=<0>;
+	wol=<1>;
 };
 
 &uart_A {
@@ -1490,7 +1520,7 @@
 
 &pcie_A {
 	reset-gpio = <&gpio GPIOX_7 GPIO_ACTIVE_HIGH>;
-	status = "disabled";
+	status = "disable";
 };
 
 &saradc {

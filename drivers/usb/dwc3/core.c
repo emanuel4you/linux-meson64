@@ -208,6 +208,11 @@ static int dwc3_core_soft_reset(struct dwc3 *dwc)
 	reg |= DWC3_GUSB3PIPECTL_PHYSOFTRST;
 	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
 
+		/* Assert USB3 PHY reset */
+	reg = dwc3_readl(dwc->regs, DWC3_GUSB3PIPECTL(1));
+	reg |= DWC3_GUSB3PIPECTL_PHYSOFTRST;
+	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(1), reg);
+
 	/* Assert USB2 PHY reset */
 	reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
 	reg |= DWC3_GUSB2PHYCFG_PHYSOFTRST;
@@ -244,6 +249,11 @@ static int dwc3_core_soft_reset(struct dwc3 *dwc)
 	reg = dwc3_readl(dwc->regs, DWC3_GUSB3PIPECTL(0));
 	reg &= ~DWC3_GUSB3PIPECTL_PHYSOFTRST;
 	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
+
+		/* Clear USB3 PHY reset */
+	reg = dwc3_readl(dwc->regs, DWC3_GUSB3PIPECTL(1));
+	reg &= ~DWC3_GUSB3PIPECTL_PHYSOFTRST;
+	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(1), reg);
 
 	/* Clear USB2 PHY reset */
 	reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
@@ -320,12 +330,16 @@ static void dwc3_frame_length_adjustment(struct dwc3 *dwc)
 
 	reg = dwc3_readl(dwc->regs, DWC3_GFLADJ);
 	dft = reg & DWC3_GFLADJ_30MHZ_MASK;
+#ifndef CONFIG_AMLOGIC_USB
 	if (!dev_WARN_ONCE(dwc->dev, dft == dwc->fladj,
 	    "request value same as default, ignoring\n")) {
+#endif
 		reg &= ~DWC3_GFLADJ_30MHZ_MASK;
 		reg |= DWC3_GFLADJ_30MHZ_SDBND_SEL | dwc->fladj;
 		dwc3_writel(dwc->regs, DWC3_GFLADJ, reg);
+#ifndef CONFIG_AMLOGIC_USB
 	}
+#endif
 }
 
 /**
@@ -760,9 +774,11 @@ static int dwc3_core_init(struct dwc3 *dwc)
 	ret = dwc3_phy_setup(dwc);
 	if (ret)
 		goto err0;
+
 #ifdef CONFIG_AMLOGIC_USB
 	reg = dwc3_readl(dwc->regs, DWC3_GUCTL1);
 	reg |= DWC3_GUCTL_NAKPERENHHS;
+	reg |= DWC3_GUCTL_PARKMODEDISABLESS;
 	dwc3_writel(dwc->regs, DWC3_GUCTL1, reg);
 
 	reg = dwc3_readl(dwc->regs, DWC3_GUCTL);
@@ -958,6 +974,7 @@ static int dwc3_core_get_phy(struct dwc3 *dwc)
 	if (dwc->usb3_phy)
 		if (dwc->usb3_phy->flags == AML_USB3_PHY_ENABLE)
 			dwc->super_speed_support = 1;
+
 #endif
 
 	dwc->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
@@ -1553,7 +1570,9 @@ MODULE_DEVICE_TABLE(acpi, dwc3_acpi_match);
 #endif
 
 static struct platform_driver dwc3_driver = {
+#ifndef CONFIG_AMLOGIC_USB
 	.probe		= dwc3_probe,
+#endif
 	.remove		= dwc3_remove,
 #ifdef CONFIG_AMLOGIC_USB
 	.shutdown	= dwc3_shutdown,
@@ -1566,7 +1585,16 @@ static struct platform_driver dwc3_driver = {
 	},
 };
 
+#ifdef CONFIG_AMLOGIC_USB
+/* AMLOGIC DWC3 driver does not allow module unload */
+static int __init amlogic_dwc3_init(void)
+{
+	return platform_driver_probe(&dwc3_driver, dwc3_probe);
+}
+late_initcall(amlogic_dwc3_init);
+#else
 module_platform_driver(dwc3_driver);
+#endif
 
 MODULE_ALIAS("platform:dwc3");
 MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");

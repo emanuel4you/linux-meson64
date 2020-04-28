@@ -34,19 +34,20 @@
 #include "hdmi_rx_edid.h"
 
 
-#define RX_VER0 "ver.2018-12-19"
+#define RX_VER0 "ver.2019/11/20"
 /*
  *
  *
  *
  *
  */
-#define RX_VER1 "ver.2018/12/27"
+#define RX_VER1 "ver.2019/11/22"
 /*
  *
  *
+ *
  */
-#define RX_VER2 "ver.2019/01/04"
+#define RX_VER2 "ver.2019/11/20"
 
 /*print type*/
 #define	LOG_EN		0x01
@@ -61,7 +62,6 @@
 #define VSI_LOG		0x800
 
 /* 50ms timer for hdmirx main loop (HDMI_STATE_CHECK_FREQ is 20) */
-
 
 #define ABS(x) ((x) < 0 ? -(x) : (x))
 
@@ -87,6 +87,7 @@ enum chip_id_e {
 	CHIP_ID_TXLX,
 	CHIP_ID_TXHD,
 	CHIP_ID_TL1,
+	CHIP_ID_TM2,
 };
 
 enum phy_ver_e {
@@ -277,6 +278,15 @@ struct rx_video_info {
 #define EMP_BUFF_MAX_PKT_CNT ((EMP_BUFFER_SIZE/2)/32 - 200)
 #define TMDS_DATA_BUFFER_SIZE	0x200000
 
+struct rx_fastswitch_mode {
+	enum hdcp_version_e hdcp_ver[E_PORT_NUM];
+	/* if edid ver is the same after switch
+	 * edid ver in UI, no need to update edid
+	 */
+	enum edid_ver_e	edid_ver[E_PORT_NUM];
+	u8 hdmi5v_sts[E_PORT_NUM];
+	/* uint8_t hpd_sts[E_PORT_NUM]; */
+};
 
 /**
  * @short HDMI RX controller HDCP configuration
@@ -325,6 +335,8 @@ struct vsi_info_s {
 	unsigned int dolby_timeout;
 	unsigned int eff_tmax_pq;
 	bool allm_mode;
+	bool hdr10plus;
+	u8 timeout;
 };
 
 #define CHANNEL_STATUS_SIZE   24
@@ -350,7 +362,7 @@ struct aud_info_s {
 	 *int down_mix_inhibit;
 	 *int level_shift_value;
 	 */
-
+	int aud_hbr_rcv;
 	int aud_packet_received;
 
 	/* channel status */
@@ -364,6 +376,7 @@ struct aud_info_s {
 	int real_channel_num;
 	int real_sample_size;
 	int real_sr;
+	u32 aud_clk;
 };
 
 struct phy_sts {
@@ -387,8 +400,8 @@ struct emp_buff {
 	phys_addr_t p_addr_b;
 	/*void __iomem *v_addr_a;*/
 	/*void __iomem *v_addr_b;*/
-	void __iomem *storeA;
-	void __iomem *storeB;
+	void __iomem *store_a;
+	void __iomem *store_b;
 	void __iomem *ready;
 	unsigned long irqcnt;
 	unsigned int emppktcnt;
@@ -419,10 +432,12 @@ struct rx_s {
 	struct hdmi_rx_hdcp hdcp;
 	/*report hpd status to app*/
 	struct extcon_dev *rx_excton_rx22;
+	struct extcon_dev *rx_excton_open;
 
 	/* wrapper */
 	unsigned int state;
 	unsigned int pre_state;
+	struct rx_fastswitch_mode fs_mode;
 	/* recovery mode */
 	unsigned char err_rec_mode;
 	unsigned char err_code;
@@ -448,6 +463,9 @@ struct rx_s {
 	/*struct pd_infoframe_s dbg_info;*/
 	struct phy_sts phy;
 	struct emp_buff empbuff;
+	uint32_t arc_port;
+	enum edid_ver_e edid_ver;
+	bool arc_5vsts;
 };
 
 struct _hdcp_ksv {
@@ -476,7 +494,7 @@ extern struct reg_map reg_maps[MAP_ADDR_MODULE_NUM];
 extern bool downstream_repeat_support;
 extern void rx_tasklet_handler(unsigned long arg);
 extern void skip_frame(unsigned int cnt);
-
+extern int cec_set_dev_info(uint8_t dev_idx);
 
 /* reg */
 
@@ -510,6 +528,16 @@ extern int sm_pause;
 extern int suspend_pddq_sel;
 extern int disable_port_num;
 extern int disable_port_en;
+extern bool video_stable_to_esm;
+extern bool pwr_sts_to_esm;
+extern bool enable_hdcp22_esm_log;
+extern bool esm_reset_flag;
+extern bool esm_auth_fail_en;
+extern bool esm_error_flag;
+extern bool hdcp22_stop_auth;
+extern bool hdcp22_esm_reset2;
+extern int esm_recovery_mode;
+
 extern int rx_set_global_variable(const char *buf, int size);
 extern void rx_get_global_variable(const char *buf);
 extern int rx_pr(const char *fmt, ...);
@@ -545,7 +573,6 @@ extern unsigned int *pd_fifo_buf;
 
 /* for other modules */
 extern int External_Mute(int mute_flag);
-extern void vdac_enable(bool on, unsigned int module_sel);
 extern int rx_is_hdcp22_support(void);
 extern int hdmirx_get_connect_info(void);
 #endif

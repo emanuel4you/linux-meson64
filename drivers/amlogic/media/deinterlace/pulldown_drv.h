@@ -17,8 +17,8 @@
 
 #ifndef _DI_PULLDOWN_H
 #define _DI_PULLDOWN_H
-#include "film_mode_fmw/film_vof_soft.h"
-#include "deinterlace_mtn.h"
+#include "../deinterlace/film_mode_fmw/film_vof_soft.h"
+#include "../deinterlace/deinterlace_mtn.h"
 
 #define MAX_VOF_WIN_NUM	4
 
@@ -46,7 +46,7 @@ struct pulldown_detected_s {
 unsigned char pulldown_init(unsigned short width, unsigned short height);
 
 unsigned int pulldown_detection(struct pulldown_detected_s *res,
-	struct combing_status_s *cmb_sts, bool reverse);
+	struct combing_status_s *cmb_sts, bool reverse, struct vframe_s *vf);
 
 void pulldown_vof_win_vshift(struct pulldown_detected_s *wins,
 	unsigned short v_offset);

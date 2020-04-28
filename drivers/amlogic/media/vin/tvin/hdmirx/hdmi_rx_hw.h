@@ -53,7 +53,7 @@
 /* TXLX */
 /* unified_register.h by wujun */
 #define HHI_AUDPLL_CLK_OUT_CNTL (0x8c << 2)
-
+#define HHI_VDAC_CNTL0_TXLX		(0xBD * 4)
 #define PREG_PAD_GPIO0_EN_N		(0x0c * 4)
 #define PREG_PAD_GPIO0_O		(0x0d * 4)
 #define PREG_PAD_GPIO0_I		(0x0e * 4)
@@ -261,6 +261,8 @@
 #define	TOP_DUK_3						0x06d
 #define TOP_NSEC_SCRATCH				0x06e
 #define	TOP_SEC_SCRATCH					0x06f
+#define TOP_EDID_OFFSET					0x200
+
 /* TL1 */
 #define	TOP_EMP_DDR_START_A				0x070
 #define	TOP_EMP_DDR_START_B				0x071
@@ -282,14 +284,19 @@
 #define	TOP_MISC_STAT0					0x084
 #define TOP_EDID_ADDR_S					0x1000
 #define TOP_EDID_ADDR_E					0x11ff
+
+/* TM2 */
+#define TOP_EDID_PORT2_ADDR_S			0x1200
+#define TOP_EDID_PORT2_ADDR_E			0x13ff
+#define TOP_EDID_PORT3_ADDR_S			0x1400
+#define TOP_EDID_PORT3_ADDR_E			0x15ff
+
+
 #define TOP_DWC_BASE_OFFSET				0x8000
 
 
 #define TOP_DONT_TOUCH0                  0x0fe
 #define TOP_DONT_TOUCH1                  0x0ff
-
-/* hdmi2.0 new end */
-#define TOP_EDID_OFFSET					0x200
 
 /*
  * HDMI registers
@@ -1055,7 +1062,9 @@
 
 /* tl1 HIU PHY register */
 #define HHI_HDMIRX_PHY_MISC_CNTL0		(0xd7<<2)/*0x040*/
+#define MISCI_COMMON_RST				_BIT(10)
 #define HHI_HDMIRX_PHY_MISC_CNTL1		(0xd8<<2)/*0x041*/
+#define MISCI_MANUAL_MODE				_BIT(22)
 #define HHI_HDMIRX_PHY_MISC_CNTL2		(0xe0<<2)/*0x042*/
 #define HHI_HDMIRX_PHY_MISC_CNTL3		(0xe1<<2)/*0x043*/
 #define HHI_HDMIRX_PHY_DCHA_CNTL0		(0xe2<<2)/*0x045*/
@@ -1064,7 +1073,7 @@
 #define HHI_HDMIRX_PHY_DCHD_CNTL0		(0xe5<<2)/*0x048*/
 #define HHI_HDMIRX_PHY_DCHD_CNTL1		(0xe6<<2)/*0x049*/
 #define HHI_HDMIRX_PHY_DCHD_CNTL2		(0xe7<<2)/*0x04A*/
-/*#define HHI_HDMIRX_PHY_MISC_STAT		(0xee<<2)*//*0x044*/
+#define HHI_HDMIRX_PHY_MISC_STAT		(0xee << 2)//0x044
 #define HHI_HDMIRX_PHY_DCHD_STAT		(0xef<<2)/*0x04B*/
 
 #define TMDS_CLK_MIN			(24000UL)
@@ -1091,6 +1100,7 @@ extern unsigned int hdmirx_addr_port;
 extern unsigned int hdmirx_data_port;
 extern unsigned int hdmirx_ctrl_port;
 extern int acr_mode;
+extern int hdcp_enc_mode;
 extern int force_clk_rate;
 extern int auto_aclk_mute;
 extern int aud_avmute_en;
@@ -1104,8 +1114,19 @@ extern int ignore_sscp_charerr;
 extern int ignore_sscp_tmds;
 extern int find_best_eq;
 extern int eq_try_cnt;
-extern void rx_get_best_eq_setting(void);
+extern int pll_rst_max;
+extern int cdr_lock_level;
+extern int top_intr_maskn_value;
+extern int hbr_force_8ch;
+extern bool term_cal_en;
+extern int clock_lock_th;
+extern int scdc_force_en;
+extern bool hdcp_hpd_ctrl_en;
+extern int eq_dbg_lvl;
+extern int phy_term_lel;
+extern bool phy_tdr_en;
 
+extern void rx_get_best_eq_setting(void);
 extern void wr_reg_hhi(unsigned int offset, unsigned int val);
 extern void wr_reg_hhi_bits(unsigned int offset, unsigned int mask,
 				unsigned int val);
@@ -1117,7 +1138,7 @@ extern void wr_reg(enum map_addr_module_e module,
 		unsigned int reg_addr,
 		unsigned int val);
 extern unsigned char rd_reg_b(enum map_addr_module_e module,
-	unsigned char reg_addr);
+	unsigned int reg_addr);
 extern void wr_reg_b(enum map_addr_module_e module,
 		unsigned int reg_addr, unsigned char val);
 extern void hdmirx_wr_top(unsigned int addr, unsigned int data);
@@ -1170,8 +1191,8 @@ extern void hdcp22_clk_en(bool en);
 extern void hdmirx_hdcp22_esm_rst(void);
 extern unsigned int rx_sec_set_duk(bool repeater);
 extern void hdmirx_hdcp22_init(void);
-extern void hdcp22_suspend(void);
-extern void hdcp22_resume(void);
+extern void hdcp_22_off(void);
+extern void hdcp_22_on(void);
 extern void hdmirx_hdcp22_hpd(bool value);
 extern void esm_set_reset(bool reset);
 extern void esm_set_stable(bool stable);
@@ -1190,6 +1211,7 @@ extern void rx_get_video_info(void);
 extern void hdmirx_set_video_mute(bool mute);
 extern void hdmirx_config_video(void);
 extern void hdmirx_config_audio(void);
+extern void set_dv_ll_mode(bool en);
 extern void rx_get_audinfo(struct aud_info_s *audio_info);
 extern bool rx_clkrate_monitor(void);
 
@@ -1198,7 +1220,7 @@ extern unsigned int rx_hdcp22_rd_reg_bits(unsigned int addr, unsigned int mask);
 extern int rx_get_aud_pll_err_sts(void);
 extern void rx_force_hpd_cfg(uint8_t hpd_level);
 extern int rx_set_port_hpd(uint8_t port_id, bool val);
-extern void rx_set_cur_hpd(uint8_t val);
+void rx_set_cur_hpd(u8 val, u8 func);
 extern unsigned int rx_get_hdmi5v_sts(void);
 extern unsigned int rx_get_hpd_sts(void);
 
@@ -1206,11 +1228,11 @@ extern void cec_hw_reset(unsigned int cec_sel);
 extern void rx_force_hpd_cfg(uint8_t hpd_level);
 extern void rx_force_rxsense_cfg(uint8_t level);
 extern void rx_force_hpd_rxsense_cfg(uint8_t level);
-extern void rx_audio_bandgap_rst(void);
-extern void rx_audio_bandgap_rst(void);
+void rx_audio_bandgap_rst(void);
+void rx_audio_bandgap_en(void);
+void rx_aml_eq_debug(int eq_lvl);
 extern void rx_phy_rxsense_pulse(unsigned int t1, unsigned int t2, bool en);
 extern void rx_phy_power_on(unsigned int onoff);
-
 
 enum measure_clk_top_e {
 	TOP_HDMI_TMDSCLK = 0,
@@ -1238,8 +1260,9 @@ enum phy_frq_band {
 	phy_frq_band_0 = 0,	/*45Mhz*/
 	phy_frq_band_1,		/*77Mhz*/
 	phy_frq_band_2,		/*155Mhz*/
-	phy_frq_band_3,		/*300Mhz*/
-	phy_frq_band_4,		/*600Mhz*/
+	phy_frq_band_3,		/*340Mhz*/
+	phy_frq_band_4,		/*525Mhz*/
+	phy_frq_band_5,		/*600Mhz*/
 	phy_frq_null = 0xf,
 };
 
@@ -1260,6 +1283,7 @@ struct apll_param {
 	unsigned int od_div;
 	unsigned int od2;
 	unsigned int od2_div;
+	unsigned int aud_div;
 };
 
 extern int rx_get_clock(enum measure_clk_top_e clk_src);
@@ -1284,6 +1308,13 @@ extern void rx_tmds_to_ddr_init(void);
 extern void rx_emp_capture_stop(void);
 extern void rx_get_error_cnt(uint32_t *ch0, uint32_t *ch1, uint32_t *ch2);
 extern void rx_get_audio_N_CTS(uint32_t *N, uint32_t *CTS);
+extern void rx_run_eq(void);
+extern bool rx_eq_done(void);
+extern bool is_tmds_valid(void);
+extern void hdmirx_top_irq_en(bool flag);
+void rx_phy_rt_cal(void);
+bool is_ft_trim_done(void);
+void aml_phy_get_trim_val(void);
 #endif
 
 

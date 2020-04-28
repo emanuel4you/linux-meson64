@@ -63,6 +63,13 @@
 			reg = <0x0 0x05300000 0x0 0x2000000>;
 			no-map;
 		};
+		logo_reserved:linux,meson-fb {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x0 0x800000>;
+			alignment = <0x0 0x400000>;
+			alloc-ranges = <0x0 0x7f800000 0x0 0x800000>;
+		};
 		ion_reserved:linux,ion-dev {
 			compatible = "shared-dma-pool";
 			reusable;
@@ -380,7 +387,8 @@
 			compatible = "amlogic, gxbb-eth-dwmac";
 			reg = <0x0 0xc9410000 0x0 0x10000
 			0x0 0xc8834540 0x0 0x8
-			0x0 0xc8834558 0x0 0xc>;
+			0x0 0xc8834558 0x0 0xc
+			0x0 0xc1104408 0x0 0x4>;
 			interrupts = <0 8 1>;
 			pinctrl-names = "external_eth_pins";
 			pinctrl-0 = <&external_eth_pins>;
@@ -479,7 +487,7 @@
 		#thermal-sensor-cells = <1>;
 		cooling_devices {
 			cpufreq_cool_cluster0 {
-				min_state = <1000000>;
+				min_state = <1200000>;
 				dyn_coeff = <140>;
 				cluster_id = <0>;
 				node_name = "cpufreq_cool0";
@@ -493,10 +501,10 @@
 				device_type = "cpucore";
 			};
 			gpufreq_cool {
-				min_state = <400>;
+				min_state = <500>;
 				dyn_coeff = <437>;
 				cluster_id = <0>;
-				node_name = "gpufreq_cool0";
+				node_name = "mali";
 				device_type = "gpufreq";
 			};
 			gpucore_cool {
@@ -513,9 +521,6 @@
 		cpucore_cool0:cpucore_cool0 {
 			#cooling-cells = <2>; /* min followed by max */
 		};
-		gpufreq_cool0:gpufreq_cool0 {
-			#cooling-cells = <2>; /* min followed by max */
-		};
 		gpucore_cool0:gpucore_cool0 {
 			#cooling-cells = <2>; /* min followed by max */
 		};
@@ -530,17 +535,17 @@
 
 			trips {
 				switch_on: trip-point@0 {
-					temperature = <70000>;
-					hysteresis = <1000>;
-					type = "passive";
-				};
-				control: trip-point@1 {
 					temperature = <80000>;
 					hysteresis = <1000>;
 					type = "passive";
 				};
+				control: trip-point@1 {
+					temperature = <90000>;
+					hysteresis = <1000>;
+					type = "passive";
+				};
 				hot: trip-point@2 {
-					temperature = <85000>;
+					temperature = <100000>;
 					hysteresis = <5000>;
 					type = "hot";
 				};
@@ -564,7 +569,7 @@
 				};
 				gpufreq_cooling_map {
 					trip = <&control>;
-					cooling-device = <&gpufreq_cool0 0 4>;
+					cooling-device = <&gpu 0 4>;
 					contribution = <1024>;
 				};
 				gpucore_cooling_map {
@@ -692,7 +697,7 @@
 		status = "okay";
 		vendor_id = <0x000000>;
 		cec_osd_string = "MBox"; /* Max Chars: 14    */
-		cec_version = <6>; /* 5: 1.4, 6: 2.0 */
+		cec_version = <5>; /* 5: 1.4, 6: 2.0 */
 		port_num = <1>;
 		arc_port_mask = <0x0>;
 		interrupts = <0 199 1>;
@@ -716,6 +721,7 @@
 		compatible = "amlogic, meson-gxl";
 		dev_name = "meson-fb";
 		status = "okay";
+		memory-region = <&logo_reserved>;
 		interrupts = <0 3 1
 			0 89 1>;
 		interrupt-names = "viu-vsync", "rdma";
@@ -727,7 +733,7 @@
 		display_size_default = <1920 1080 1920 3240 32>;
 		/*1920*1080*4*3 = 0x17BB000*/
 		mem_alloc = <1>;
-		logo_addr = "0x7dc00000";
+		logo_addr = "0x7f800000";
 	};
 	ge2d {
 		compatible = "amlogic, ge2d-gxl";
@@ -828,6 +834,11 @@
 			"pcm_mclk",
 			"pcm_sclk";
 		pcm_mode = <1>; /* 0=slave mode, 1=master mode */
+		dai-format = "dsp_a";
+		dai-tdm-slot-tx-mask = <1>;
+		dai-tdm-slot-rx-mask = <1>;
+		dai-tdm-slot-num = <2>;
+		dai-tdm-slot-width = <16>;
 	};
 	i2s_plat: i2s_platform {
 		compatible = "amlogic, aml-i2s";

@@ -88,6 +88,10 @@ static char *phy_switch_table[] = {
 static struct dsi_phy_s dsi_phy_config;
 static struct dsi_vid_s dsi_vconf;
 static unsigned short dsi_rx_n;
+static int lp_tesc_val = 250;
+EXPORT_SYMBOL(lp_tesc_val);
+static int lp_lpx_val = 100;
+EXPORT_SYMBOL(lp_lpx_val);
 
 static void mipi_dsi_init_table_print(struct dsi_config_s *dconf, int on_off)
 {
@@ -152,11 +156,11 @@ static void mipi_dsi_init_table_print(struct dsi_config_s *dconf, int on_off)
 	}
 }
 
-static void mipi_dsi_dphy_print_info(struct dsi_config_s *dconf)
+static void mipi_dsi_dphy_print_info(struct lcd_config_s *pconf)
 {
 	unsigned int temp;
 
-	temp = ((1000000 * 100) / (dconf->bit_rate / 1000)) * 8;
+	temp = ((1000000 * 100) / (pconf->lcd_timing.bit_rate / 1000)) * 8;
 	pr_info("MIPI DSI DPHY timing (unit: ns)\n"
 		"  UI:                %d.%02d\n"
 		"  LP TESC:           %d\n"
@@ -217,7 +221,7 @@ static void mipi_dsi_host_print_info(struct lcd_config_s *pconf)
 	struct dsi_config_s *dconf;
 
 	dconf = pconf->lcd_control.mipi_config;
-	esc_clk = dconf->bit_rate / 8 / dsi_phy_config.lp_tesc;
+	esc_clk = pconf->lcd_timing.bit_rate / 8 / dsi_phy_config.lp_tesc;
 	factor = dconf->factor_numerator;
 	factor = ((factor * 1000 / dconf->factor_denominator) + 5) / 10;
 
@@ -243,7 +247,8 @@ static void mipi_dsi_host_print_info(struct lcd_config_s *pconf)
 		"  data format:           %s\n"
 		"  lp escape clock:       %d.%03dMHz\n",
 		dconf->lane_num, dconf->bit_rate_max,
-		(dconf->bit_rate / 1000000), (dconf->bit_rate % 1000000) / 1000,
+		(pconf->lcd_timing.bit_rate / 1000000),
+		(pconf->lcd_timing.bit_rate % 1000000) / 1000,
 		factor,
 		operation_mode_table[dconf->operation_mode_init],
 		dconf->operation_mode_init,
@@ -267,7 +272,7 @@ void mipi_dsi_print_info(struct lcd_config_s *pconf)
 {
 	mipi_dsi_host_print_info(pconf);
 
-	mipi_dsi_dphy_print_info(pconf->lcd_control.mipi_config);
+	mipi_dsi_dphy_print_info(pconf);
 	mipi_dsi_video_print_info(pconf->lcd_control.mipi_config);
 }
 
@@ -472,6 +477,10 @@ static void check_phy_status(void)
 
 static void dsi_phy_init(struct dsi_phy_s *dphy, unsigned char lane_num)
 {
+	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
+	struct lcd_config_s *pconf;
+
+	pconf = lcd_drv->lcd_config;
 	/* enable phy clock. */
 	dsi_phy_write(MIPI_DSI_PHY_CTRL,  0x1); /* enable DSI top clock. */
 	dsi_phy_write(MIPI_DSI_PHY_CTRL,
@@ -501,9 +510,18 @@ static void dsi_phy_init(struct dsi_phy_s *dphy, unsigned char lane_num)
 		(dphy->clk_zero << 16) | (dphy->clk_prepare << 24)));
 	dsi_phy_write(MIPI_DSI_CLK_TIM1, dphy->clk_pre); /* ?? */
 	/* 0x050f090d */
-	dsi_phy_write(MIPI_DSI_HS_TIM,
-		(dphy->hs_exit | (dphy->hs_trail << 8) |
-		(dphy->hs_zero << 16) | (dphy->hs_prepare << 24)));
+	if (pconf->lcd_timing.bit_rate > 500000000UL) { /*more than 500M*/
+		dsi_phy_write(MIPI_DSI_HS_TIM,
+			      (dphy->hs_exit | (dphy->hs_trail << 8) |
+			      (dphy->hs_zero << 16) |
+			      (dphy->hs_prepare << 24)));
+	} else {
+		LCDPR("bit_rata = %d\n", pconf->lcd_timing.bit_rate);
+		dsi_phy_write(MIPI_DSI_HS_TIM,
+			      (dphy->hs_exit | ((dphy->hs_trail / 2) << 8) |
+			      (dphy->hs_zero << 16) |
+			      (dphy->hs_prepare << 24)));
+	}
 	/* 0x4a370e0e */
 	dsi_phy_write(MIPI_DSI_LP_TIM,
 		(dphy->lp_lpx | (dphy->lp_ta_sure << 8) |
@@ -789,6 +807,7 @@ int dsi_set_operation_mode(unsigned char op_mode)
 
 	return 0;
 }
+EXPORT_SYMBOL(dsi_set_operation_mode);
 
 /* *************************************************************
  * mipi dsi command support
@@ -895,26 +914,47 @@ static int wait_bta_ack(void)
 }
 
 /* *************************************************************
- * Function: wait_cmd_fifo_empty
+ * Function: wait_cmd_fifo_space
  * Poll to check if the generic command fifo is empty
  */
-static int wait_cmd_fifo_empty(void)
+static inline int wait_cmd_fifo_space(void)
 {
 	unsigned int cmd_status;
 	int i = CMD_TIMEOUT_CNT;
 
-	do {
+	while (1) {
+		cmd_status = dsi_host_getb(MIPI_DSI_DWC_CMD_PKT_STATUS_OS,
+				BIT_GEN_CMD_FULL, 1);
+		if (cmd_status == 0 || i == 0)
+			break;
 		udelay(10);
 		i--;
-		cmd_status = dsi_host_getb(MIPI_DSI_DWC_CMD_PKT_STATUS_OS,
-				BIT_GEN_CMD_EMPTY, 1);
-	} while ((cmd_status != 0x1) && (i > 0));
-
-	if (cmd_status == 0) {
-		cmd_status = dsi_host_read(MIPI_DSI_DWC_CMD_PKT_STATUS_OS);
-		print_mipi_cmd_status(i, cmd_status);
-		return -1;
 	}
+
+	print_mipi_cmd_status(i, cmd_status);
+
+	return 0;
+}
+
+/* *************************************************************
+ * Function: wait_pld_fifo_space
+ * Poll to check if the generic command fifo is empty
+ */
+static inline int wait_pld_fifo_space(void)
+{
+	unsigned int cmd_status;
+	int i = CMD_TIMEOUT_CNT;
+
+	while (1) {
+		cmd_status = dsi_host_getb(MIPI_DSI_DWC_CMD_PKT_STATUS_OS,
+				BIT_GEN_PLD_W_FULL, 1);
+		if (cmd_status == 0 || i == 0)
+			break;
+		udelay(10);
+		i--;
+	}
+
+	print_mipi_cmd_status(i, cmd_status);
 
 	return 0;
 }
@@ -978,6 +1018,8 @@ static void dsi_set_max_return_pkt_size(struct dsi_cmd_request_s *req)
 {
 	unsigned int d_para[2];
 
+	wait_cmd_fifo_space();
+
 	d_para[0] = (unsigned int)(req->payload[2] & 0xff);
 	d_para[1] = (unsigned int)(req->payload[3] & 0xff);
 	dsi_rx_n = (unsigned short)((d_para[1] << 8) | d_para[0]);
@@ -988,8 +1030,6 @@ static void dsi_set_max_return_pkt_size(struct dsi_cmd_request_s *req)
 		(DT_SET_MAX_RET_PKT_SIZE << BIT_GEN_DT)));
 	if (req->req_ack == MIPI_DSI_DCS_REQ_ACK)
 		wait_bta_ack();
-	else if (req->req_ack == MIPI_DSI_DCS_NO_ACK)
-		wait_cmd_fifo_empty();
 }
 
 #ifdef DSI_CMD_READ_VALID
@@ -1106,6 +1146,8 @@ static int dsi_generic_write_short_packet(struct dsi_cmd_request_s *req)
 	unsigned int d_para[2];
 	int ret = 0;
 
+	wait_cmd_fifo_space();
+
 	switch (req->data_type) {
 	case DT_GEN_SHORT_WR_1:
 		d_para[0] = (req->pld_count == 0) ?
@@ -1132,8 +1174,6 @@ static int dsi_generic_write_short_packet(struct dsi_cmd_request_s *req)
 		(((unsigned int)req->data_type) << BIT_GEN_DT)));
 	if (req->req_ack == MIPI_DSI_DCS_REQ_ACK)
 		ret = wait_bta_ack();
-	else if (req->req_ack == MIPI_DSI_DCS_NO_ACK)
-		ret = wait_cmd_fifo_empty();
 
 	return ret;
 }
@@ -1148,6 +1188,8 @@ static int dsi_dcs_write_short_packet(struct dsi_cmd_request_s *req)
 	unsigned int d_command, d_para;
 	int ret = 0;
 
+	wait_cmd_fifo_space();
+
 	d_command = ((unsigned int)req->payload[2]) & 0xff;
 	d_para = (req->pld_count < 2) ?
 		0 : (((unsigned int)req->payload[3]) & 0xff);
@@ -1159,8 +1201,6 @@ static int dsi_dcs_write_short_packet(struct dsi_cmd_request_s *req)
 		(((unsigned int)req->data_type) << BIT_GEN_DT)));
 	if (req->req_ack == MIPI_DSI_DCS_REQ_ACK)
 		ret = wait_bta_ack();
-	else if (req->req_ack == MIPI_DSI_DCS_NO_ACK)
-		ret = wait_cmd_fifo_empty();
 
 	return ret;
 }
@@ -1173,7 +1213,6 @@ static int dsi_dcs_write_short_packet(struct dsi_cmd_request_s *req)
 static int dsi_write_long_packet(struct dsi_cmd_request_s *req)
 {
 	unsigned int d_command, payload_data, header_data;
-	unsigned int cmd_status;
 	unsigned int i, j, data_index, n, temp;
 	int ret = 0;
 
@@ -1194,20 +1233,8 @@ static int dsi_write_long_packet(struct dsi_cmd_request_s *req)
 				req->payload[data_index+(i*4)+j]) << (j*8));
 		}
 
-		/* Check the pld fifo status before write to it,
-		 * do not need check every word
-		 */
-		if ((i == (n/3)) || (i == (n/2))) {
-			j = CMD_TIMEOUT_CNT;
-			do {
-				udelay(10);
-				j--;
-				cmd_status = dsi_host_read(
-						MIPI_DSI_DWC_CMD_PKT_STATUS_OS);
-			} while ((((cmd_status >> BIT_GEN_PLD_W_FULL) & 0x1) ==
-				0x1) && (j > 0));
-			print_mipi_cmd_status(j, cmd_status);
-		}
+		wait_pld_fifo_space();
+
 		/* Use direct memory write to save time when in
 		 * WRITE_MEMORY_CONTINUE
 		 */
@@ -1220,14 +1247,8 @@ static int dsi_write_long_packet(struct dsi_cmd_request_s *req)
 		}
 	}
 
-	/* Check cmd fifo status before write to it */
-	j = CMD_TIMEOUT_CNT;
-	do {
-		udelay(10);
-		j--;
-		cmd_status = dsi_host_read(MIPI_DSI_DWC_CMD_PKT_STATUS_OS);
-	} while ((((cmd_status >> BIT_GEN_CMD_FULL) & 0x1) == 0x1) && (j > 0));
-	print_mipi_cmd_status(j, cmd_status);
+	wait_cmd_fifo_space();
+
 	/* Write Header Register */
 	/* include command */
 	header_data = ((((unsigned int)req->pld_count) << BIT_GEN_WC_LSBYTE) |
@@ -1236,8 +1257,6 @@ static int dsi_write_long_packet(struct dsi_cmd_request_s *req)
 	generic_if_wr(MIPI_DSI_DWC_GEN_HDR_OS, header_data);
 	if (req->req_ack == MIPI_DSI_DCS_REQ_ACK)
 		ret = wait_bta_ack();
-	else if (req->req_ack == MIPI_DSI_DCS_NO_ACK)
-		ret = wait_cmd_fifo_empty();
 
 	return ret;
 }
@@ -1377,7 +1396,7 @@ mipi_dsi_check_state_err:
 int dsi_write_cmd(unsigned char *payload)
 {
 	int i = 0, j = 0, step = 0;
-	unsigned char cmd_size;
+	unsigned short cmd_size;
 #ifdef DSI_CMD_READ_VALID
 	int k = 0, n = 0;
 	unsigned char rd_data[100];
@@ -1388,6 +1407,7 @@ int dsi_write_cmd(unsigned char *payload)
 	unsigned char vc_id = MIPI_DSI_VIRTUAL_CHAN_ID;
 	unsigned int req_ack = MIPI_DSI_DCS_ACK_TYPE;
 	int delay_ms, ret = 0;
+	int ext_len = 0;
 
 	/* mipi command(payload) */
 	/* format:  data_type, cmd_size, data.... */
@@ -1413,10 +1433,17 @@ int dsi_write_cmd(unsigned char *payload)
 			mdelay(payload[i+1]);
 		}
 
-		if (cmd_size == 0) {
+		if (cmd_size == 0 && ((payload[i] != DT_DCS_LONG_WR && payload[i] != DT_GEN_LONG_WR) || ext_len == 0)) {
 			i += (cmd_size + 2);
 			continue;
 		}
+
+		if (payload[i] == LCD_EXT_CMD_TYPE_XLEN) {
+			ext_len = cmd_size << 8;
+			i += 2;
+			continue;
+		}
+
 		if (i + 2 + cmd_size > DSI_CMD_SIZE_MAX) {
 			LCDERR("step %d: cmd_size out of support\n", step);
 			break;
@@ -1471,6 +1498,13 @@ int dsi_write_cmd(unsigned char *payload)
 				break;
 			case DT_DCS_LONG_WR:
 			case DT_GEN_LONG_WR:
+				dsi_cmd_req.pld_count |= ext_len;
+				cmd_size |= ext_len;
+				ext_len = 0;
+				if (i + 2 + cmd_size > DSI_CMD_SIZE_MAX) {
+					LCDERR("step %d: cmd_size_ext out of support\n", step);
+					break;
+				}
 				ret = dsi_write_long_packet(&dsi_cmd_req);
 				break;
 			case DT_TURN_ON:
@@ -1539,6 +1573,8 @@ int dsi_write_cmd(unsigned char *payload)
 
 	return step;
 }
+
+EXPORT_SYMBOL(dsi_write_cmd);
 
 static void mipi_dsi_phy_config(struct dsi_phy_s *dphy, unsigned int dsi_ui)
 {
@@ -1699,13 +1735,13 @@ static void mipi_dsi_non_burst_packet_config(struct lcd_config_s *pconf)
 	hactive = pconf->lcd_basic.h_active;
 	bit_rate_required = pconf->lcd_timing.lcd_clk * 3 * dsi_vconf.data_bits;
 	bit_rate_required = bit_rate_required / lane_num;
-	if (dconf->bit_rate > bit_rate_required)
+	if (pconf->lcd_timing.bit_rate > bit_rate_required)
 		multi_pkt_en = 1;
 	else
 		multi_pkt_en = 0;
 	if (lcd_debug_print_flag) {
 		LCDPR("non-burst: bit_rate_required=%d, bit_rate=%d\n",
-			bit_rate_required, dconf->bit_rate);
+			bit_rate_required, pconf->lcd_timing.bit_rate);
 	}
 
 	if (multi_pkt_en == 0) {
@@ -2018,11 +2054,11 @@ void lcd_mipi_dsi_config_post(struct lcd_config_s *pconf)
 
 	/* pclk lanebyteclk factor */
 	if (dconf->factor_numerator == 0) {
-		lanebyteclk = dconf->bit_rate / 8 / 1000;
+		lanebyteclk = pconf->lcd_timing.bit_rate / 8 / 1000;
 		LCDPR("pixel_clk = %d.%03dMHz, bit_rate = %d.%03dMHz\n",
 			(pclk / 1000), (pclk % 1000),
-			(dconf->bit_rate / 1000000),
-			((dconf->bit_rate / 1000) % 1000));
+			(pconf->lcd_timing.bit_rate / 1000000),
+			((pconf->lcd_timing.bit_rate / 1000) % 1000));
 #if 0
 		dconf->factor_numerator = pclk;
 		dconf->factor_denominator = lanebyteclk;
@@ -2042,7 +2078,7 @@ void lcd_mipi_dsi_config_post(struct lcd_config_s *pconf)
 		mipi_dsi_vid_mode_config(pconf);
 
 	/* phy config */
-	mipi_dsi_phy_config(&dsi_phy_config, dconf->bit_rate);
+	mipi_dsi_phy_config(&dsi_phy_config, pconf->lcd_timing.bit_rate);
 }
 
 static void mipi_dsi_host_on(struct lcd_config_s *pconf)

@@ -346,6 +346,11 @@
 #define HEVC_SAO_DBG_DATA_5 0x3635
 #define HEVC_SAO_DBG_DATA_6 0x3636
 #define HEVC_SAO_DBG_DATA_7 0x3637
+#define HEVC_SAO_MMU_STATUS 0x3639
+#define HEVC_SAO_MMU_DMA_CTRL   0x363e
+#define HEVC_SAO_MMU_DMA_STATUS 0x363f
+#define HEVC_CM_CORE_STATUS 0x3640
+#define HEVC_SAO_MMU_RESET_CTRL  0x3641
 #define HEVC_IQIT_CLK_RST_CTRL 0x3700
 #define HEVC_IQIT_DEQUANT_CTRL 0x3701
 #define HEVC_IQIT_SCALELUT_WR_ADDR 0x3702
@@ -357,6 +362,14 @@
 #define HEVC_IQIT_STAT_GEN0 0x3708
 #define HEVC_QP_WRITE 0x3709
 #define HEVC_IQIT_STAT_GEN1 0x370a
+#define HEVC_IQIT_BITDEPTH                         0x370b
+#define HEVC_IQIT_STAT_GEN2                        0x370c
+#define HEVC_IQIT_AVS2_WQP_0123                    0x370d
+#define HEVC_IQIT_AVS2_WQP_45                      0x370e
+#define HEVC_IQIT_AVS2_QP_DELTA                    0x370f
+#define HEVC_PIC_QUALITY_CTRL                      0x3710
+#define HEVC_PIC_QUALITY_DATA                      0x3711
+
 /**/
 
 /*add from M8M2*/

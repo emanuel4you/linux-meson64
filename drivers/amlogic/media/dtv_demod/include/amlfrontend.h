@@ -29,8 +29,8 @@ struct amlfe_config {
 	int tuner_addr;
 };
 enum Gxtv_Demod_Tuner_If {
-	Si2176_5M_If = 5,
-	Si2176_6M_If = 6
+	SI2176_5M_IF = 5,
+	SI2176_6M_IF = 6
 };
 /* 0 -DVBC, 1-DVBT, ISDBT, 2-ATSC */
 enum Gxtv_Demod_Dvb_Mode {
@@ -39,10 +39,22 @@ enum Gxtv_Demod_Dvb_Mode {
 	Gxtv_Atsc = 2,
 	Gxtv_Dtmb = 3,
 };
+
+enum demod_md {
+	UNKNOWN = 0,
+	AML_DVBC,
+	AML_DTMB,
+	AML_DVBT,
+	AML_ATSC,
+	AML_J83B,
+	AML_ISDBT,
+	AML_DVBT2
+};
+
 #define Adc_Clk_35M             35714	/* adc clk    dvbc */
 #define Demod_Clk_71M   71428	/* demod clk */
 
-#define Adc_Clk_24M             24000
+#define ADC_CLK_24M             24000
 #define Demod_Clk_72M       72000
 #define Demod_Clk_60M       60000
 
@@ -118,8 +130,9 @@ struct ss_reg_vt {
 #define IC_VER_GXLX	(0x03)
 #define IC_VER_TXHD	(0x04)
 #define IC_VER_TL1	(0x05)
+#define IC_VER_TM2	(0x06)
 
-#define IC_VER_NUB	(0x06)
+#define IC_VER_NUB	(0x07)
 
 
 /*-----------------------*/
@@ -272,7 +285,6 @@ extern struct amldtvdemod_device_s *dtvdd_devp;	/**/
 
 /*int M6_Demod_Dtmb_Init(struct aml_fe_dev *dev);*/
 int convert_snr(int in_snr);
-extern int vdac_enable_check_dtv(void);
 
 
 extern unsigned  int ats_thread_flg;
@@ -448,4 +460,7 @@ extern unsigned int dtmb_is_update_delay(void);
 extern unsigned int dtmb_get_delay_clear(void);
 extern unsigned int dtmb_is_have_check(void);
 extern void dtmb_poll_v3(void);
+extern enum demod_md demod_get_current_mode(void);
+extern unsigned int demod_dvbc_get_fast_search(void);
+extern void demod_dvbc_set_fast_search(unsigned int en);
 #endif

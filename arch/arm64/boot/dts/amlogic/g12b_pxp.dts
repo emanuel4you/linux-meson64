@@ -21,6 +21,7 @@
 
 / {
 	model = "Amlogic";
+	amlogic-dt-id = "g12b_skt_b";
 	compatible = "amlogic, g12b";
 	interrupt-parent = <&gic>;
 	#address-cells = <2>;
@@ -37,7 +38,7 @@
 
 	memory@00000000 {
 		device_type = "memory";
-		linux,usable-memory = <0x0 0x100000 0x0 0x3ff00000>;
+		linux,usable-memory = <0x0 0x0 0x0 0x40000000>;
 	};
 
 	reserved-memory {
@@ -97,6 +98,13 @@
 			size = <0x0 0x02800000>;
 			alignment = <0x0 0x400000>;
 		};
+
+		/* POST PROCESS MANAGER */
+		ppmgr_reserved:linux,ppmgr {
+			compatible = "amlogic, ppmgr_memory";
+			size = <0x0>;
+		};
+
 		codec_mm_cma:linux,codec_mm_cma {
 			compatible = "shared-dma-pool";
 			reusable;
@@ -165,6 +173,12 @@
 		memory-region = <&codec_mm_cma &codec_mm_reserved>;
 		dev_name = "codec_mm";
 		status = "okay";
+	};
+
+	ppmgr {
+		compatible = "amlogic, ppmgr";
+		status = "okay";
+		memory-region = <&ppmgr_reserved>;
 	};
 
 	deinterlace {
@@ -349,48 +363,40 @@
 		opp-shared;
 
 		opp00 {
-			opp-hz = /bits/ 64 <100000000>;
-			opp-microvolt = <731000>;
-		};
-		opp01 {
-			opp-hz = /bits/ 64 <250000000>;
-			opp-microvolt = <731000>;
-		};
-		opp02 {
 			opp-hz = /bits/ 64 <500000000>;
 			opp-microvolt = <731000>;
 		};
-		opp03 {
+		opp01 {
 			opp-hz = /bits/ 64 <667000000>;
 			opp-microvolt = <731000>;
 		};
-		opp04 {
+		opp02 {
 			opp-hz = /bits/ 64 <1000000000>;
-			opp-microvolt = <731000>;
-		};
-		opp05 {
-			opp-hz = /bits/ 64 <1200000000>;
-			opp-microvolt = <731000>;
-		};
-		opp06 {
-			opp-hz = /bits/ 64 <1398000000>;
 			opp-microvolt = <761000>;
 		};
-		opp07 {
+		opp03 {
+			opp-hz = /bits/ 64 <1200000000>;
+			opp-microvolt = <781000>;
+		};
+		opp04 {
+			opp-hz = /bits/ 64 <1398000000>;
+			opp-microvolt = <811000>;
+		};
+		opp05 {
 			opp-hz = /bits/ 64 <1512000000>;
-			opp-microvolt = <791000>;
-		};
-		opp08 {
-			opp-hz = /bits/ 64 <1608000000>;
-			opp-microvolt = <831000>;
-		};
-		opp09 {
-			opp-hz = /bits/ 64 <1704000000>;
 			opp-microvolt = <861000>;
 		};
-		opp10 {
+		opp06 {
+			opp-hz = /bits/ 64 <1608000000>;
+			opp-microvolt = <901000>;
+		};
+		opp07 {
+			opp-hz = /bits/ 64 <1704000000>;
+			opp-microvolt = <951000>;
+		};
+		opp08 {
 			opp-hz = /bits/ 64 <1800000000>;
-			opp-microvolt = <981000>;
+			opp-microvolt = <1001000>;
 		};
 	};
 
@@ -399,44 +405,56 @@
 		opp-shared;
 
 		opp00 {
-			opp-hz = /bits/ 64 <100000000>;
-			opp-microvolt = <751000>;
+			opp-hz = /bits/ 64 <500000000>;
+			opp-microvolt = <731000>;
 		};
 		opp01 {
-			opp-hz = /bits/ 64 <250000000>;
-			opp-microvolt = <751000>;
+			opp-hz = /bits/ 64 <667000000>;
+			opp-microvolt = <731000>;
 		};
 		opp02 {
-			opp-hz = /bits/ 64 <500000000>;
-			opp-microvolt = <751000>;
+			opp-hz = /bits/ 64 <1000000000>;
+			opp-microvolt = <731000>;
 		};
 		opp03 {
-			opp-hz = /bits/ 64 <667000000>;
+			opp-hz = /bits/ 64 <1200000000>;
 			opp-microvolt = <751000>;
 		};
 		opp04 {
-			opp-hz = /bits/ 64 <1000000000>;
+			opp-hz = /bits/ 64 <1398000000>;
 			opp-microvolt = <771000>;
 		};
 		opp05 {
-			opp-hz = /bits/ 64 <1200000000>;
+			opp-hz = /bits/ 64 <1512000000>;
 			opp-microvolt = <771000>;
 		};
 		opp06 {
-			opp-hz = /bits/ 64 <1398000000>;
-			opp-microvolt = <791000>;
+			opp-hz = /bits/ 64 <1608000000>;
+			opp-microvolt = <781000>;
 		};
 		opp07 {
-			opp-hz = /bits/ 64 <1512000000>;
-			opp-microvolt = <821000>;
+			opp-hz = /bits/ 64 <1704000000>;
+			opp-microvolt = <791000>;
 		};
 		opp08 {
-			opp-hz = /bits/ 64 <1608000000>;
-			opp-microvolt = <861000>;
+			opp-hz = /bits/ 64 <1800000000>;
+			opp-microvolt = <831000>;
 		};
 		opp09 {
-			opp-hz = /bits/ 64 <1704000000>;
-			opp-microvolt = <891000>;
+			opp-hz = /bits/ 64 <1908000000>;
+			opp-microvolt = <861000>;
+		};
+		opp10 {
+			opp-hz = /bits/ 64 <2016000000>;
+			opp-microvolt = <911000>;
+		};
+		opp11 {
+			opp-hz = /bits/ 64 <2100000000>;
+			opp-microvolt = <951000>;
+		};
+		opp12 {
+			opp-hz = /bits/ 64 <2208000000>;
+			opp-microvolt = <1011000>;
 		};
 	};
 

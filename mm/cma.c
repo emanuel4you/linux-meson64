@@ -39,6 +39,8 @@
 #ifdef CONFIG_AMLOGIC_CMA
 #include <asm/pgtable.h>
 #include <linux/amlogic/aml_cma.h>
+#include <linux/delay.h>
+#include <linux/amlogic/secmon.h>
 #endif /* CONFIG_AMLOGIC_CMA */
 
 #include "cma.h"
@@ -279,10 +281,22 @@ static int __init cma_init_reserved_areas(void)
 		if (ret)
 			return ret;
 	}
-
+#ifdef CONFIG_AMLOGIC_SEC
+	/*
+	 * A73 cache speculate prefetch may cause SError when boot.
+	 * because it may prefetch cache line in secure memory range
+	 * which have already reserved by bootloader. So we must
+	 * clear mmu of secmon range before A73 core boot up
+	 */
+	secmon_clear_cma_mmu();
+#endif
 	return 0;
 }
+#ifdef CONFIG_AMLOGIC_CMA
+early_initcall(cma_init_reserved_areas);
+#else
 core_initcall(cma_init_reserved_areas);
+#endif
 
 /**
  * cma_init_reserved_mem() - create custom contiguous area from reserved memory
@@ -499,6 +513,10 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 	int ret;
 #ifdef CONFIG_AMLOGIC_CMA
 	int dummy;
+	unsigned long long tick;
+	unsigned long long in_tick, timeout;
+
+	in_tick = sched_clock();
 #endif /* CONFIG_AMLOGIC_CMA */
 
 	if (!cma || !cma->count)
@@ -507,6 +525,13 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 	pr_debug("%s(cma %p, count %zu, align %d)\n", __func__, (void *)cma,
 		 count, align);
 
+#ifdef CONFIG_AMLOGIC_CMA
+	tick = sched_clock();
+	cma_debug(0, NULL, "(cma %p, count %zu, align %d)\n",
+		  (void *)cma, count, align);
+	in_tick = sched_clock();
+	timeout = 2ULL * 1000000 * (1 + ((count * PAGE_SIZE) >> 20));
+#endif
 	if (!count)
 		return NULL;
 
@@ -561,6 +586,13 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 	#ifndef CONFIG_AMLOGIC_CMA
 		/* try again with a bit different memory target */
 		start = bitmap_no + mask + 1;
+	#else
+		/*
+		 * CMA allocation time out, may blocked on some pages
+		 * relax CPU and try later
+		 */
+		if ((sched_clock() - in_tick) >= timeout)
+			usleep_range(1000, 2000);
 	#endif /* CONFIG_AMLOGIC_CMA */
 	}
 
@@ -568,6 +600,8 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 
 #ifdef CONFIG_AMLOGIC_CMA
 	aml_cma_alloc_post_hook(&dummy, count, page);
+	cma_debug(0, NULL, "return page:%lx, tick:%lld\n",
+		  page ? page_to_pfn(page) : 0, sched_clock() - tick);
 #endif /* CONFIG_AMLOGIC_CMA */
 	pr_debug("%s(): returned %p\n", __func__, page);
 	return page;

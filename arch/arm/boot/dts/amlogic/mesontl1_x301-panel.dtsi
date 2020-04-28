@@ -32,7 +32,7 @@
 			"tcon_gate",
 			"fclk_div5",
 			"clk_tcon";
-		reg = <0xff660000 0x8100
+		reg = <0xff660000 0xd000
 			0xff634400 0x300>;
 		interrupts = <0 3 1
 			0 78 1
@@ -81,7 +81,7 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				6 /*clk_ss_level*/
+				15 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			lvds_attr = <
@@ -166,7 +166,7 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				6 /*clk_ss_level*/
+				15 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			lvds_attr = <
@@ -208,7 +208,7 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				1 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			vbyone_attr = <
@@ -220,6 +220,7 @@
 				1 /*vbyone_intr_enable */
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <0 0 1 50 /*panel power on*/
@@ -250,7 +251,7 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				1 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			vbyone_attr = <
@@ -262,6 +263,7 @@
 				1   /*vbyone_intr_enable*/
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <
@@ -306,6 +308,7 @@
 				1   /*vbyone_intr_enable*/
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <
@@ -338,7 +341,7 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				1 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			vbyone_attr = <
@@ -350,6 +353,7 @@
 				1   /*vbyone_intr_enable*/
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <
@@ -384,7 +388,7 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				1 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			vbyone_attr = <
@@ -396,6 +400,7 @@
 				1   /*vbyone_intr_enable*/
 				3>; /*vbyone_vsync_intr_enable*/
 			phy_attr=<0xf 1>; /* vswing_level, preem_level */
+			hw_filter=<0 0>;  /* filter_time, filter_cnt*/
 
 			/* power step: type, index, value, delay(ms) */
 			power_on_step = <
@@ -432,13 +437,14 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				0 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			p2p_attr = <
-				0  /* teyp: 0=ceds, 1=cmpi, 2=isp, 3=epi,
-				    *       10=chpi, 11=cspi, 12=usit
-				    */
+				0x0  /* p2p_teyp:
+				      *  0x0=ceds, 0x1=cmpi, 0x2=isp, 0x3=epi,
+				      *  0x10=chpi, 0x11=cspi, 0x12=usit
+				      */
 				12 /* channel_num */
 				0x76543210 /* channel_sel0 */
 				0xba98   /* channel_sel1 */
@@ -480,13 +486,14 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				0 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			p2p_attr = <
-				0  /* teyp: 0=ceds, 1=cmpi, 2=isp, 3=epi,
-				    *       10=chpi, 11=cspi, 12=usit
-				    */
+				0x0  /* p2p_teyp:
+				      *  0x0=ceds, 0x1=cmpi, 0x2=isp, 0x3=epi,
+				      *  0x10=chpi, 0x11=cspi, 0x12=usit
+				      */
 				6 /* channel_num */
 				0x76543210 /* channel_sel0 */
 				0xba98   /* channel_sel1 */
@@ -527,13 +534,14 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				0 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			p2p_attr = <
-				10  /* teyp: 0=ceds, 1=cmpi, 2=isp, 3=epi,
-				     *       10=chpi, 11=cspi, 12=usit
-				     */
+				0x10  /* p2p_teyp:
+				       *  0x0=ceds, 0x1=cmpi, 0x2=isp, 0x3=epi,
+				       *  0x10=chpi, 0x11=cspi, 0x12=usit
+				       */
 				6 /* channel_num */
 				0x76543210 /* channel_sel0 */
 				0xba98   /* channel_sel1 */
@@ -574,13 +582,14 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				0 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			p2p_attr = <
-				10  /* teyp: 0=ceds, 1=cmpi, 2=isp, 3=epi,
-				     *       10=chpi, 11=cspi, 12=usit
-				     */
+				0x10  /* p2p_teyp:
+				       *  0x0=ceds, 0x1=cmpi, 0x2=isp, 0x3=epi,
+				       *  0x10=chpi, 0x11=cspi, 0x12=usit
+				       */
 				12 /* channel_num */
 				0x76543210 /* channel_sel0 */
 				0xba98   /* channel_sel1 */
@@ -621,14 +630,14 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				0 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			minilvds_attr = <
 				6 /* channel_num */
-				0x12304567 /* channel_sel0 */
-				0x0   /* channel_sel1 */
-				0xaa0 /* clk_phase */
+				0x76543210 /* channel_sel0 */
+				0xba98     /* channel_sel1 */
+				0x660 /* clk_phase */
 				0   /* pn_swap */
 				0>; /* bit_swap */
 			phy_attr=<0xf 0>; /* vswing_level, preem_level */
@@ -666,14 +675,14 @@
 				   *(0=clk, 1=htotal, 2=vtotal, 3=auto_range,
 				   * 4=hdmi_mode)
 				   */
-				0 /*clk_ss_level*/
+				3 /*clk_ss_level*/
 				1 /*clk_auto_generate*/
 				0>; /*pixel_clk(unit in Hz)*/
 			minilvds_attr = <
 				6 /* channel_num */
-				0x45603012 /* channel_sel0 */
-				0x0 /* channel_sel1 */
-				0xaa0 /* clk_phase */
+				0x76543210 /* channel_sel0 */
+				0xba98     /* channel_sel1 */
+				0x660 /* clk_phase */
 				0   /* pn_swap */
 				0>; /* bit_swap */
 			phy_attr=<0xf 0>; /* vswing_level, preem_level */

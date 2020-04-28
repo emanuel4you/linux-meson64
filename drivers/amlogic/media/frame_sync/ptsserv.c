@@ -55,6 +55,7 @@ struct pts_rec_s {
 	struct list_head list;
 	u32 offset;
 	u32 val;
+	u32 size;
 	u64 pts_uS64;
 } /*pts_rec_t */;
 
@@ -69,6 +70,7 @@ struct pts_table_s {
 	unsigned long buf_start;
 	u32 buf_size;
 	int first_checkin_pts;
+	u64 first_checkin_pts_uS64;
 	int first_lookup_ok;
 	int first_lookup_is_fail;	/*1: first lookup fail;*/
 					   /*0: first lookup success */
@@ -443,25 +445,28 @@ static int pts_checkin_offset_inline(u8 type, u32 offset, u32 val, u64 uS64)
 
 		if (type == PTS_TYPE_VIDEO && pTable->first_checkin_pts == -1) {
 			pTable->first_checkin_pts = val;
+			pTable->first_checkin_pts_uS64 = uS64;
 			timestamp_checkin_firstvpts_set(val);
 			/*
 			 *if(tsync_get_debug_pts_checkin() &&
 			 * tsync_get_debug_vpts()) {
 			 */
-			pr_debug("first check in vpts <0x%x:0x%x> ok!\n",
-					offset,
-					val);
+			pr_debug(
+				"first check in vpts <0x%x:0x%x(0x%llx)> ok!\n",
+				offset, val, uS64);
 			/* } */
 		}
 		if (type == PTS_TYPE_AUDIO && pTable->first_checkin_pts == -1) {
 			pTable->first_checkin_pts = val;
+			pTable->first_checkin_pts_uS64 = uS64;
 			timestamp_checkin_firstapts_set(val);
 			/*
 			 *if (tsync_get_debug_pts_checkin() &&
 			 * tsync_get_debug_apts()) {
 			 */
-			pr_info("first check in apts <0x%x:0x%x> ok!\n", offset,
-					val);
+			pr_info(
+				"first check in apts <0x%x:0x%x(0x%llx)> ok!\n",
+				offset, val, uS64);
 			/* } */
 		}
 
@@ -498,6 +503,7 @@ static int pts_checkin_offset_inline(u8 type, u32 offset, u32 val, u64 uS64)
 #ifdef CALC_CACHED_TIME
 		pts_checkin_offset_calc_cached(offset, val, pTable);
 #endif
+		timestamp_clac_pts_latency(type, val);
 
 		list_move_tail(&rec->list, &pTable->valid_list);
 
@@ -510,7 +516,7 @@ static int pts_checkin_offset_inline(u8 type, u32 offset, u32 val, u64 uS64)
 			if (tsync_get_debug_apts() && (type == PTS_TYPE_AUDIO))
 				pr_info("init apts[%d] at 0x%x\n", type, val);
 
-			if (type == PTS_TYPE_VIDEO)
+			if (type == PTS_TYPE_VIDEO && !tsync_get_tunnel_mode())
 				timestamp_vpts_set(val);
 			else if (type == PTS_TYPE_AUDIO)
 				timestamp_apts_set(val);
@@ -561,7 +567,8 @@ int pts_checkin_wrptr(u8 type, u32 ptr, u32 val)
 	get_wrpage_offset(type, &page, &cur_offset);
 
 	page_no = (offset > cur_offset) ? (page - 1) : page;
-
+	if (type == PTS_TYPE_VIDEO)
+		val += tsync_get_vpts_adjust();
 	return pts_checkin_offset(type,
 			pts_table[type].buf_size * page_no + offset,
 			val);
@@ -644,7 +651,7 @@ int get_last_checkout_pts(u8 type)
 }
 EXPORT_SYMBOL(get_last_checkout_pts);
 
-int pts_lookup(u8 type, u32 *val, u32 pts_margin)
+int pts_lookup(u8 type, u32 *val, u32 *frame_size, u32 pts_margin)
 {
 	u32 page, offset;
 
@@ -652,18 +659,20 @@ int pts_lookup(u8 type, u32 *val, u32 pts_margin)
 
 	if (type == PTS_TYPE_VIDEO) {
 		offset = page * pts_table[PTS_TYPE_VIDEO].buf_size + offset;
-		pts_lookup_offset(PTS_TYPE_VIDEO, offset, val, pts_margin);
+		pts_lookup_offset(
+			PTS_TYPE_VIDEO, offset, val, frame_size, pts_margin);
 		return 0;
 	} else if (type == PTS_TYPE_AUDIO) {
 		offset = page * pts_table[PTS_TYPE_AUDIO].buf_size + offset;
-		pts_lookup_offset(PTS_TYPE_AUDIO, offset, val, pts_margin);
+		pts_lookup_offset(
+			PTS_TYPE_AUDIO, offset, val, frame_size, pts_margin);
 		return 0;
 	} else
 		return -EINVAL;
 }
 EXPORT_SYMBOL(pts_lookup);
 static int pts_lookup_offset_inline_locked(u8 type, u32 offset, u32 *val,
-		u32 pts_margin, u64 *uS64)
+		u32 *frame_size, u32 pts_margin, u64 *uS64)
 {
 	struct pts_table_s *pTable;
 	int lookup_threshold;
@@ -756,6 +765,12 @@ static int pts_lookup_offset_inline_locked(u8 type, u32 offset, u32 *val,
 
 				p2 = p;
 			}
+
+			/* if p2 lookup fail, set p2 = p */
+			if (type == PTS_TYPE_VIDEO && p2 && p &&
+			OFFSET_DIFF(offset, p2->offset) > lookup_threshold &&
+			abs(OFFSET_DIFF(offset, p->offset)) < lookup_threshold)
+				p2 = p;
 		} else if (OFFSET_LATER(p->offset, offset)) {
 			list_for_each_entry_continue_reverse(p,
 					&pTable->
@@ -775,6 +790,9 @@ static int pts_lookup_offset_inline_locked(u8 type, u32 offset, u32 *val,
 		} else
 			p2 = p;
 
+		if (type == PTS_TYPE_VIDEO)
+			*frame_size = p->size;
+
 		if ((p2) &&
 			(OFFSET_DIFF(offset, p2->offset) < lookup_threshold)) {
 			if (p2->val == 0)	/* FFT: set valid vpts */
@@ -786,8 +804,9 @@ static int pts_lookup_offset_inline_locked(u8 type, u32 offset, u32 *val,
 					("vpts look up offset<0x%x> -->",
 					 offset);
 					pr_info
-					("<0x%x:0x%x>, look_cnt = %d\n",
-					 p2->offset, p2->val, look_cnt);
+				("<0x%x:0x%x>, fsize %x, look_cnt = %d\n",
+							p2->offset, p2->val,
+							p2->size, look_cnt);
 				}
 
 				if (tsync_get_debug_apts()
@@ -803,6 +822,7 @@ static int pts_lookup_offset_inline_locked(u8 type, u32 offset, u32 *val,
 			}
 			*val = p2->val;
 			*uS64 = p2->pts_uS64;
+			*frame_size = p2->size;
 
 #ifdef CALC_CACHED_TIME
 			pTable->last_checkout_pts = p2->val;
@@ -918,7 +938,7 @@ static int pts_lookup_offset_inline_locked(u8 type, u32 offset, u32 *val,
 			 */
 			if (!pTable->first_lookup_ok) {
 				*val = pTable->first_checkin_pts;
-				*uS64 = (u64)(*val) << 32;
+				*uS64 = pTable->first_checkin_pts_uS64;
 				pTable->first_lookup_ok = 1;
 				pTable->first_lookup_is_fail = 1;
 
@@ -1128,14 +1148,15 @@ static int pts_pick_by_offset_inline_locked(u8 type, u32 offset, u32 *val,
 
 
 static int pts_lookup_offset_inline(u8 type, u32 offset, u32 *val,
-		u32 pts_margin, u64 *uS64)
+		u32 *frame_size, u32 pts_margin, u64 *uS64)
 {
 	unsigned long flags;
 	int res;
 
 	spin_lock_irqsave(&lock, flags);
 	res = pts_lookup_offset_inline_locked(
-				type, offset, val, pts_margin, uS64);
+				type, offset, val,
+				frame_size, pts_margin, uS64);
 
 #if 0
 	if (timestamp_firstvpts_get() == 0 && res == 0 && (*val) != 0
@@ -1173,18 +1194,21 @@ static int pts_pick_by_offset_inline(u8 type, u32 offset, u32 *val,
 }
 
 
-int pts_lookup_offset(u8 type, u32 offset, u32 *val, u32 pts_margin)
+int pts_lookup_offset(u8 type, u32 offset, u32 *val,
+	u32 *frame_size, u32 pts_margin)
 {
 	u64 pts_us;
 
-	return pts_lookup_offset_inline(type, offset, val, pts_margin, &pts_us);
+	return pts_lookup_offset_inline(type, offset, val,
+				frame_size, pts_margin, &pts_us);
 }
 EXPORT_SYMBOL(pts_lookup_offset);
 
-int pts_lookup_offset_us64(u8 type, u32 offset, u32 *val, u32 pts_margin,
-						   u64 *uS64)
+int pts_lookup_offset_us64(u8 type, u32 offset, u32 *val,
+			u32 *frame_size, u32 pts_margin, u64 *uS64)
 {
-	return pts_lookup_offset_inline(type, offset, val, pts_margin, uS64);
+	return pts_lookup_offset_inline(type, offset, val,
+				frame_size, pts_margin, uS64);
 }
 EXPORT_SYMBOL(pts_lookup_offset_us64);
 

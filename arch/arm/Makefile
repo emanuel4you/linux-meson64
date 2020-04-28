@@ -52,6 +52,10 @@ AS		+= -EL
 LD		+= -EL
 endif
 
+ifeq ($(CONFIG_KASAN),y)
+KASAN_SHADOW_OFFSET := 0xA0000000
+endif
+
 #
 # The Scalar Replacement of Aggregates (SRA) optimization pass in GCC 4.9 and
 # later may result in code being generated that handles signed short and signed
@@ -148,7 +152,7 @@ endif
 textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
 textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
 textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
-textofs-$(CONFIG_ARCH_MESON) := 0x00208000
+textofs-$(CONFIG_ARCH_MESON) := 0x00108000
 
 # Machine directory name.  This list is sorted alphanumerically
 # by CONFIG_* macro name.
@@ -334,6 +338,9 @@ $(BOOT_TARGETS): vmlinux
 
 $(INSTALL_TARGETS):
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+
+amlogic/%.dtb: | scripts
+	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
 
 %.dtb: | scripts
 	$(Q)$(MAKE) $(build)=$(boot)/dts/amlogic MACHINE=$(MACHINE) $(boot)/dts/amlogic/$@

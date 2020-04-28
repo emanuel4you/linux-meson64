@@ -92,9 +92,11 @@ static int atv_stable_fmt_check_enable;
 static int atv_prestable_out_cnt = 100;
 static int other_stable_out_cnt = EXIT_STABLE_MAX_CNT;
 static int other_unstable_out_cnt = BACK_STABLE_MAX_CNT;
+static int manual_unstable_out_cnt = 30;
 static int other_unstable_in_cnt = UNSTABLE_MAX_CNT;
 static int nosig_in_cnt = NOSIG_MAX_CNT;
 static int nosig2_unstable_cnt = EXIT_NOSIG_MAX_CNT;
+bool manual_flag;
 
 #ifdef DEBUG_SUPPORT
 module_param(back_nosig_max_cnt, int, 0664);
@@ -285,6 +287,11 @@ static void hdmirx_dv_check(struct vdin_dev_s *devp,
 		tvin_smr_init(devp->index);
 		devp->dv.dv_flag = prop->dolby_vision;
 	}
+
+	if (prop->low_latency != devp->dv.low_latency)
+		devp->dv.low_latency = prop->low_latency;
+	memcpy(&devp->dv.dv_vsif,
+			&prop->dv_vsif, sizeof(struct tvin_dv_vsif_s));
 }
 
 void reset_tvin_smr(unsigned int index)
@@ -315,6 +322,9 @@ void tvin_smr(struct vdin_dev_s *devp)
 
 	if ((devp->flags & VDIN_FLAG_SM_DISABLE) ||
 		(devp->flags & VDIN_FLAG_SUSPEND))
+		return;
+
+	if (!(devp->flags & VDIN_FLAG_DEC_OPENED))
 		return;
 
 	sm_p = &sm_dev[devp->index];
@@ -393,7 +403,8 @@ void tvin_smr(struct vdin_dev_s *devp)
 				if (sm_p->state_cnt >= unstb_in) {
 					sm_p->state_cnt  = unstb_in;
 					info->status = TVIN_SIG_STATUS_UNSTABLE;
-					info->fmt = TVIN_SIG_FMT_NULL;
+					/*info->fmt = TVIN_SIG_FMT_NULL;*/
+
 					if (sm_debug_enable &&
 						!sm_print_unstable) {
 						pr_info("[smr.%d] unstable\n",
@@ -408,6 +419,9 @@ void tvin_smr(struct vdin_dev_s *devp)
 					(port == TVIN_PORT_CVBS0)) &&
 					(devp->flags & VDIN_FLAG_SNOW_FLAG))
 					unstb_in = sm_p->atv_unstable_out_cnt;
+				else if ((port == TVIN_PORT_CVBS3) &&
+					manual_flag)
+					unstb_in = manual_unstable_out_cnt;
 				else if ((port >= TVIN_PORT_HDMI0) &&
 						 (port <= TVIN_PORT_HDMI7))
 					unstb_in = sm_p->hdmi_unstable_out_cnt;
@@ -433,23 +447,14 @@ void tvin_smr(struct vdin_dev_s *devp)
 						devp->parm.info.fps =
 							prop->fps;
 					}
-				} else
-					info->fmt = TVIN_SIG_FMT_NULL;
-				if (info->fmt == TVIN_SIG_FMT_NULL) {
-					/* remove unsupport status */
-					info->status = TVIN_SIG_STATUS_UNSTABLE;
-					if (sm_debug_enable &&
-						!sm_print_notsup) {
-						pr_info("[smr.%d] unstable --> not support\n",
-								devp->index);
-						sm_print_notsup = 1;
-					}
-				} else {
+
 					if (sm_ops->fmt_config)
 						sm_ops->fmt_config(fe);
+
 					tvin_smr_init_counter(devp->index);
 					sm_p->state = TVIN_SM_STATUS_PRESTABLE;
 					sm_atv_prestable_fmt = info->fmt;
+
 					if (sm_debug_enable) {
 						pr_info("[smr.%d]unstable-->prestable",
 						devp->index);
@@ -457,11 +462,22 @@ void tvin_smr(struct vdin_dev_s *devp)
 						info->fmt,
 						tvin_sig_fmt_str(info->fmt));
 					}
+
 					sm_print_nosig  = 0;
 					sm_print_unstable = 0;
 					sm_print_fmt_nosig = 0;
 					sm_print_fmt_chg = 0;
 					sm_print_prestable = 0;
+
+				} else {
+					info->status = TVIN_SIG_STATUS_UNSTABLE;
+
+					if (sm_debug_enable &&
+						!sm_print_notsup) {
+						pr_info("[smr.%d] unstable --> not support\n",
+								devp->index);
+						sm_print_notsup = 1;
+					}
 				}
 			}
 		}
@@ -648,10 +664,14 @@ void tvin_smr(struct vdin_dev_s *devp)
 		sm_p->state = TVIN_SM_STATUS_NOSIG;
 		break;
 	}
-	if (sm_p->sig_status != info->status) {
-		sm_p->sig_status = info->status;
-		wake_up(&devp->queue);
+
+	if (devp->flags & VDIN_FLAG_DEC_OPENED) {
+		if (sm_p->sig_status != info->status) {
+			sm_p->sig_status = info->status;
+			wake_up(&devp->queue);
+		}
 	}
+
 	signal_status = sm_p->sig_status;
 }
 

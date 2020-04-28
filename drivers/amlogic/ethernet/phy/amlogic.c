@@ -32,6 +32,7 @@
 #include <linux/ethtool.h>
 #include <linux/phy.h>
 #include <linux/amlogic/scpi_protocol.h>
+#include <linux/amlogic/cpu_version.h>
 
 #define  SMI_ADDR_TSTWRITE    23
 
@@ -149,7 +150,14 @@ void custom_internal_config(struct phy_device *phydev)
 	 *if env tx_amp ==0 we will use the efuse
 	 */
 	efuse_amp = scpi_get_ethernet_calc();
-	efuse_valid = (efuse_amp >> 3);
+	pr_info("efuse tx_amp = %d\n", efuse_amp);
+	if (is_meson_g12b_cpu() && is_meson_rev_a()) {
+		efuse_valid = (efuse_amp >> 3);
+		efuse_amp = efuse_amp & 0x7;
+	} else {
+		efuse_valid = ((efuse_amp >> 4) & 0x3);
+		efuse_amp = efuse_amp & 0xf;
+	}
 	env_valid = (tx_amp >> 7);
 	if (env_valid || efuse_valid) {
 
@@ -157,11 +165,9 @@ void custom_internal_config(struct phy_device *phydev)
 		if (env_valid) {
 			/*debug mode use env tx_amp*/
 			setup_amp = tx_amp & (~0x80);
-			pr_info("debug mode tx_amp = %d\n", setup_amp);
 		} else {
 			/* efuse is valid but env not*/
 			setup_amp = efuse_amp;
-			pr_info("use efuse tx_amp = %d\n", setup_amp);
 		}
 		/*Enable Analog and DSP register Bank access by*/
 		phy_write(phydev, 0x14, 0x0000);
@@ -386,7 +392,6 @@ static struct phy_driver amlogic_internal_driver[] = {
 	.read_status	= genphy_read_status,
 	.suspend	= genphy_suspend,
 	.resume		= genphy_resume,
-	.remove		= internal_phy_remove,
 } };
 
 module_phy_driver(amlogic_internal_driver);

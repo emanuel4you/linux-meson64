@@ -331,7 +331,7 @@ int dvbc_set_ch(struct aml_demod_sta *demod_sta,
 		ret = -1;
 	}
 	/* if (ret != 0) return ret; */
-	demod_sta->dvb_mode = 0;
+	//demod_sta->dvb_mode = 0;
 	demod_sta->ch_mode = mode;
 	/* 0:16, 1:32, 2:64, 3:128, 4:256 */
 	demod_sta->agc_mode = 1;
@@ -350,7 +350,8 @@ int dvbc_set_ch(struct aml_demod_sta *demod_sta,
 	if (demod_sta->ch_if == 0)
 		demod_sta->ch_if = 5000;
 	demod_sta->symb_rate = symb_rate;
-	if ((!is_ic_ver(IC_VER_TL1)) && is_dvbc_ver(IC_DVBC_V3))
+	if ((!is_ic_ver(IC_VER_TL1)) && !is_ic_ver(IC_VER_TM2)
+		&& is_dvbc_ver(IC_DVBC_V3))
 		demod_sta->adc_freq = demod_dvbc->dat0;
 
 #if 0

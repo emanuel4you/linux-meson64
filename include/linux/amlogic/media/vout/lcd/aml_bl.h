@@ -50,6 +50,8 @@ enum bl_chip_type_e {
 	BL_CHIP_G12A,
 	BL_CHIP_G12B,
 	BL_CHIP_TL1,
+	BL_CHIP_SM1,
+	BL_CHIP_TM2,
 	BL_CHIP_MAX,
 };
 
@@ -96,6 +98,12 @@ enum bl_off_policy_e {
 	BL_OFF_POLICY_ONCE,
 	BL_OFF_POLICY_MAX,
 };
+
+#define BL_LEVEL_MASK                        0xfff
+#define BL_POLICY_BRIGHTNESS_BYPASS_BIT      15
+#define BL_POLICY_BRIGHTNESS_BYPASS_MASK     1
+#define BL_POLICY_POWER_ON_BIT               12
+#define BL_POLICY_POWER_ON_MASK              3
 
 #define BL_GPIO_OUTPUT_LOW      0
 #define BL_GPIO_OUTPUT_HIGH     1

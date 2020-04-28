@@ -461,9 +461,9 @@ enum tv_enc_lcd_type_e {
 
 /* **** DPHY timing parameter       Value (unit: 0.01ns) **** */
 /* >100ns (4M) */
-#define DPHY_TIME_LP_TESC(ui)       (250 * 100)
+#define DPHY_TIME_LP_TESC(ui)       (lp_tesc_val * 100)
 /* >50ns */
-#define DPHY_TIME_LP_LPX(ui)        (100 * 100)
+#define DPHY_TIME_LP_LPX(ui)        (lp_lpx_val * 100)
 /* (lpx, 2*lpx) */
 #define DPHY_TIME_LP_TA_SURE(ui)    DPHY_TIME_LP_LPX(ui)
 /* 4*lpx */

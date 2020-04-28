@@ -192,6 +192,8 @@
 
 #define VPP_CLIP_MISC0 0x1dd9
 #define VPP_CLIP_MISC1 0x1dda
+#define VPP_VD1_CLIP_MISC0 0x1de1
+#define VPP_VD1_CLIP_MISC1 0x1de2
 
 #define VPP2_MISC 0x1e26
 #define VPP2_OFIFO_SIZE 0x1e27
@@ -245,8 +247,15 @@
 #define OSD1_BLEND_SRC_CTRL 0x1dfd
 #define OSD2_BLEND_SRC_CTRL 0x1dfe
 
+#define VPP_POST_BLEND_BLEND_DUMMY_DATA 0x3968
+#define VPP_POST_BLEND_DUMMY_ALPHA 0x3969
+
 /* after g12b */
 #define SRSHARP0_SHARP_SYNC_CTRL 0x3eb0
 #define SRSHARP1_SHARP_SYNC_CTRL 0x3fb0
+
+#define VPU_RDARB_MODE_L2C1          0x279d
+#define VPU_WRARB_MODE_L2C1          0x27a2
+
 #endif
 

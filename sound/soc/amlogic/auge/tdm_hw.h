@@ -21,6 +21,16 @@
 #include "audio_io.h"
 #include "regs.h"
 
+#define TDM_A	0
+#define TDM_B	1
+#define TDM_C	2
+#define TDM_LB	3
+
+#define LANE_MAX0 2
+#define LANE_MAX1 4
+#define LANE_MAX2 6
+#define LANE_MAX3 8
+
 //	TODO: fix me, now based by tl1
 enum tdmin_src {
 	PAD_TDMINA_DIN = 0,
@@ -71,6 +81,7 @@ extern void aml_tdm_arb_config(
 extern void aml_tdm_fifo_reset(
 	struct aml_audio_controller *actrl,
 	int stream, int index);
+void aml_tdmout_enable_gain(int tdmout_id, int en);
 
 extern int tdmout_get_frddr_type(int bitwidth);
 
@@ -96,8 +107,7 @@ extern void aml_update_tdmin_rev_ws(struct aml_audio_controller *actrl,
 
 extern void aml_tdm_set_slot_out(
 	struct aml_audio_controller *actrl,
-	int index, int slots, int slot_width,
-	int force_oe, int oe_val);
+	int index, int slots, int slot_width);
 
 extern void aml_tdm_set_slot_in(
 	struct aml_audio_controller *actrl,
@@ -117,7 +127,7 @@ extern void aml_tdm_set_channel_mask(
 
 extern void aml_tdm_set_lane_channel_swap(
 	struct aml_audio_controller *actrl,
-	int stream, int index, int swap);
+	int stream, int index, int swap0, int swap1);
 
 extern void aml_tdm_set_bclk_ratio(
 	struct aml_audio_controller *actrl,
@@ -138,8 +148,30 @@ extern void aml_tdmout_get_aed_info(int tdmout_id,
 
 extern void aml_tdm_clk_pad_select(
 	struct aml_audio_controller *actrl,
-	int mpad, int mclk_sel,
+	int mpad, int mpad_offset, int mclk_sel,
 	int tdm_index, int clk_sel);
+void aml_tdm_mclk_pad_select(struct aml_audio_controller *actrl,
+			     int mpad, int mpad_offset, int mclk_sel);
+void aml_tdm_sclk_pad_select(struct aml_audio_controller *actrl,
+			     int mpad_offset, int tdm_index, int clk_sel);
 
 extern void i2s_to_hdmitx_ctrl(int tdm_index);
+void aml_tdm_mute_playback(
+		struct aml_audio_controller *actrl,
+		int index,
+		bool mute,
+		int lane_cnt);
+void aml_tdm_mute_capture(
+		struct aml_audio_controller *actrl,
+		int tdm_index,
+		bool mute,
+		int lane_cnt);
+void aml_tdm_out_reset(unsigned int tdm_id, int offset);
+void aml_tdm_set_oe_v1(
+	struct aml_audio_controller *actrl,
+	int index, int force_oe, int oe_val);
+void aml_tdm_set_oe_v2(
+	struct aml_audio_controller *actrl,
+	int index, int force_oe, int oe_val);
+
 #endif

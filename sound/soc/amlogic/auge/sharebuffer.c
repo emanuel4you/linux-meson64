@@ -24,7 +24,7 @@
 #include "spdif_hw.h"
 
 static int sharebuffer_spdifout_prepare(struct snd_pcm_substream *substream,
-	struct frddr *fr, int spdif_id)
+	struct frddr *fr, int spdif_id, int lane_i2s)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int bit_depth;
@@ -34,7 +34,10 @@ static int sharebuffer_spdifout_prepare(struct snd_pcm_substream *substream,
 
 	spdifout_samesource_set(spdif_id,
 		aml_frddr_get_fifo_id(fr),
-		bit_depth, true);
+		bit_depth,
+		runtime->channels,
+		true,
+		lane_i2s);
 
 	/* spdif to hdmitx */
 	spdifout_to_hdmitx_ctrl(spdif_id);
@@ -59,12 +62,14 @@ static int sharebuffer_spdifout_free(struct snd_pcm_substream *substream,
 	if (spdif_id != 1)
 		spdifout_samesource_set(spdif_id,
 			aml_frddr_get_fifo_id(fr),
-			bit_depth, false);
+			bit_depth,
+			runtime->channels,
+			false, 0);
 
 	return 0;
 }
 
-void sharebuffer_enable(int sel, bool enable)
+void sharebuffer_enable(int sel, bool enable, bool reenable)
 {
 	if (sel < 0) {
 		pr_err("Not support same source\n");
@@ -73,12 +78,12 @@ void sharebuffer_enable(int sel, bool enable)
 		// TODO: same with tdm
 	} else if (sel < 5) {
 		/* same source with spdif a/b */
-		spdifout_enable(sel - 3, enable);
+		spdifout_enable(sel - 3, enable, reenable);
 	}
 }
 
 int sharebuffer_prepare(struct snd_pcm_substream *substream,
-	void *pfrddr, int samesource_sel)
+	void *pfrddr, int samesource_sel, int lane_i2s, int offset)
 {
 	struct frddr *fr = (struct frddr *)pfrddr;
 
@@ -90,7 +95,8 @@ int sharebuffer_prepare(struct snd_pcm_substream *substream,
 		// TODO: same with tdm
 	} else if (samesource_sel < 5) {
 		/* same source with spdif a/b */
-		sharebuffer_spdifout_prepare(substream, fr, samesource_sel - 3);
+		sharebuffer_spdifout_prepare(substream,
+			fr, samesource_sel - 3, lane_i2s);
 	}
 
 	/* frddr, share buffer, src_sel1 */
@@ -122,18 +128,18 @@ int sharebuffer_free(struct snd_pcm_substream *substream,
 }
 
 
-int sharebuffer_trigger(int cmd, int samesource_sel)
+int sharebuffer_trigger(int cmd, int samesource_sel, bool reenable)
 {
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		sharebuffer_enable(samesource_sel, true);
+		sharebuffer_enable(samesource_sel, true, reenable);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		sharebuffer_enable(samesource_sel, false);
+		sharebuffer_enable(samesource_sel, false, reenable);
 		break;
 	default:
 		return -EINVAL;

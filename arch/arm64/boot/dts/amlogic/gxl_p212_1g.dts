@@ -50,6 +50,13 @@
 		#size-cells = <2>;
 		ranges;
 		/* global autoconfigured region for contiguous allocations */
+		ramoops@0x07400000 {
+			compatible = "ramoops";
+			reg = <0x0 0x07400000 0x0 0x00100000>;
+			record-size = <0x8000>;
+			console-size = <0x8000>;
+			ftrace-size = <0x40000>;
+		};
 		secmon_reserved:linux,secmon {
 			compatible = "shared-dma-pool";
 			reusable;
@@ -399,7 +406,8 @@
 			compatible = "amlogic, gxbb-eth-dwmac";
 			reg = <0x0 0xc9410000 0x0 0x10000
 			0x0 0xc8834540 0x0 0x8
-			0x0 0xc8834558 0x0 0xc>;
+			0x0 0xc8834558 0x0 0xc
+			0x0 0xc1104408 0x0 0x4>;
 			interrupts = <0 8 1>;
 			pinctrl-names = "external_eth_pins";
 			pinctrl-0 = <&external_eth_pins>;
@@ -421,7 +429,7 @@
 		#thermal-sensor-cells = <1>;
 		cooling_devices {
 			cpufreq_cool_cluster0 {
-				min_state = <1000000>;
+				min_state = <1200000>;
 				dyn_coeff = <140>;
 				cluster_id = <0>;
 				node_name = "cpufreq_cool0";
@@ -435,10 +443,10 @@
 				device_type = "cpucore";
 			};
 			gpufreq_cool {
-				min_state = <400>;
+				min_state = <500>;
 				dyn_coeff = <437>;
 				cluster_id = <0>;
-				node_name = "gpufreq_cool0";
+				node_name = "mali";
 				device_type = "gpufreq";
 			};
 			gpucore_cool {
@@ -455,9 +463,6 @@
 		cpucore_cool0:cpucore_cool0 {
 			#cooling-cells = <2>; /* min followed by max */
 		};
-		gpufreq_cool0:gpufreq_cool0 {
-			#cooling-cells = <2>; /* min followed by max */
-		};
 		gpucore_cool0:gpucore_cool0 {
 			#cooling-cells = <2>; /* min followed by max */
 		};
@@ -472,17 +477,17 @@
 
 			trips {
 				switch_on: trip-point@0 {
-					temperature = <70000>;
-					hysteresis = <1000>;
-					type = "passive";
-				};
-				control: trip-point@1 {
 					temperature = <80000>;
 					hysteresis = <1000>;
 					type = "passive";
 				};
+				control: trip-point@1 {
+					temperature = <90000>;
+					hysteresis = <1000>;
+					type = "passive";
+				};
 				hot: trip-point@2 {
-					temperature = <85000>;
+					temperature = <100000>;
 					hysteresis = <5000>;
 					type = "hot";
 				};
@@ -506,7 +511,7 @@
 				};
 				gpufreq_cooling_map {
 					trip = <&control>;
-					cooling-device = <&gpufreq_cool0 0 4>;
+					cooling-device = <&gpu 0 4>;
 					contribution = <1024>;
 				};
 				gpucore_cooling_map {
@@ -858,6 +863,11 @@
 			"pcm_mclk",
 			"pcm_sclk";
 		pcm_mode = <1>; /* 0=slave mode, 1=master mode */
+		dai-format = "dsp_a";
+		dai-tdm-slot-tx-mask = <1>;
+		dai-tdm-slot-rx-mask = <1>;
+		dai-tdm-slot-num = <2>;
+		dai-tdm-slot-width = <16>;
 	};
 	i2s_plat: i2s_platform {
 		compatible = "amlogic, aml-i2s";
@@ -927,6 +937,15 @@
 			sound-dai = <&pcm_codec>;
 		};
 	};
+
+	amlkaraoke {
+		compatible = "amlogic, aml_karaoke";
+		dev_name = "aml_karaoke";
+		status = "okay";
+		interrupts = <0 48 1>;
+		interrupt-names = "aml_karaoke";
+	};
+
 	/* END OF AUDIO board specific */
 	rdma{
 		compatible = "amlogic, meson, rdma";
@@ -1091,7 +1110,7 @@
 		compatible = "amlogic, unifykey";
 		status = "ok";
 
-		unifykey-num = <17>;
+		unifykey-num = <18>;
 		unifykey-index-0 = <&keysn_0>;
 		unifykey-index-1 = <&keysn_1>;
 		unifykey-index-2 = <&keysn_2>;
@@ -1109,6 +1128,7 @@
 		unifykey-index-14= <&keysn_14>;
 		unifykey-index-15= <&keysn_15>;
 		unifykey-index-16= <&keysn_16>;
+		unifykey-index-17= <&keysn_17>;
 
 		keysn_0: key_0{
 			key-name = "usid";
@@ -1195,6 +1215,11 @@
 		};
 		keysn_16:key_16{
 			key-name = "netflix_mgkid";
+			key-device = "secure";
+			key-permit = "read","write","del";
+		};
+		keysn_17:key_17{
+			key-name = "attestationdevidbox";// attest dev id box
 			key-device = "secure";
 			key-permit = "read","write","del";
 		};

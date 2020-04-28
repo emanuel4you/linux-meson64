@@ -20,6 +20,9 @@
 
 #include <linux/amlogic/media/sound/aout_notify.h>
 #include <linux/amlogic/media/sound/spdif_info.h>
+#ifdef CONFIG_AMLOGIC_HDMITX
+#include <linux/amlogic/media/vout/hdmi_tx/hdmi_tx_ext.h>
+#endif
 
 /*
  * 0 --  other formats except(DD,DD+,DTS)
@@ -30,6 +33,11 @@
  */
 unsigned int IEC958_mode_codec;
 EXPORT_SYMBOL(IEC958_mode_codec);
+
+bool spdifout_is_raw(void)
+{
+	return (IEC958_mode_codec && IEC958_mode_codec != 9);
+}
 
 bool spdif_is_4x_clk(void)
 {
@@ -195,3 +203,29 @@ int spdif_format_set_enum(
 	IEC958_mode_codec = index;
 	return 0;
 }
+
+#ifdef CONFIG_AMLOGIC_HDMITX
+unsigned int aml_audio_hdmiout_mute_flag;
+/* call HDMITX API to enable/disable internal audio out */
+int aml_get_hdmi_out_audio(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = !hdmitx_ext_get_audio_status();
+
+	aml_audio_hdmiout_mute_flag =
+			ucontrol->value.integer.value[0];
+	return 0;
+}
+
+int aml_set_hdmi_out_audio(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_value *ucontrol)
+{
+	bool mute = ucontrol->value.integer.value[0];
+
+	if (aml_audio_hdmiout_mute_flag != mute) {
+		hdmitx_ext_set_audio_output(!mute);
+		aml_audio_hdmiout_mute_flag = mute;
+	}
+	return 0;
+}
+#endif

@@ -131,7 +131,8 @@ static int lcd_vout_clr_state(int index)
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
 
 	lcd_vout_state &= ~(1 << index);
-	lcd_drv->viu_sel = LCD_VIU_SEL_NONE;
+	if (lcd_drv->viu_sel == index)
+		lcd_drv->viu_sel = LCD_VIU_SEL_NONE;
 
 	return 0;
 }
@@ -192,22 +193,11 @@ static int lcd_framerate_automation_set_mode(void)
 #endif
 
 	/* change clk parameter */
-	switch (lcd_drv->lcd_config->lcd_timing.clk_change) {
-	case LCD_CLK_PLL_CHANGE:
-		lcd_clk_generate_parameter(lcd_drv->lcd_config);
-		lcd_clk_set(lcd_drv->lcd_config);
-		break;
-	case LCD_CLK_FRAC_UPDATE:
-		lcd_clk_update(lcd_drv->lcd_config);
-		break;
-	default:
-		break;
-	}
+	lcd_clk_change(lcd_drv->lcd_config);
 	lcd_tablet_config_post_update(lcd_drv->lcd_config);
 	lcd_venc_change(lcd_drv->lcd_config);
 
-	vout_notifier_call_chain(VOUT_EVENT_MODE_CHANGE,
-		&lcd_drv->lcd_info->mode);
+	lcd_vout_notify_mode_change();
 
 	return 0;
 }
@@ -267,6 +257,7 @@ static int lcd_set_vframe_rate_hint(int duration)
 	/* update vinfo */
 	info->sync_duration_num = duration_num;
 	info->sync_duration_den = duration_den;
+	lcd_drv->fr_mode = 1;
 
 	lcd_framerate_automation_set_mode();
 #endif
@@ -291,9 +282,15 @@ static int lcd_set_vframe_rate_end_hint(void)
 		LCDPR("%s: return mode = %s, policy = %d\n", __func__,
 			info->name, lcd_drv->fr_auto_policy);
 
+		if (lcd_drv->fr_mode == 0) {
+			LCDPR("%s: fr_mode is invalid, exit\n", __func__);
+			return 0;
+		}
+
 		/* update vinfo */
 		info->sync_duration_num = lcd_drv->std_duration.duration_num;
 		info->sync_duration_den = lcd_drv->std_duration.duration_den;
+		lcd_drv->fr_mode = 0;
 
 		lcd_framerate_automation_set_mode();
 	}
@@ -851,6 +848,22 @@ static int lcd_config_load_from_dts(struct lcd_config_s *pconf,
 				pconf->lcd_control.vbyone_config->phy_preem);
 			}
 		}
+		ret = of_property_read_u32_array(child, "hw_filter",
+			&para[0], 2);
+		if (ret) {
+			if (lcd_debug_print_flag)
+				LCDPR("failed to get hw_filter\n");
+		} else {
+			pconf->lcd_control.vbyone_config->hw_filter_time =
+				para[0];
+			pconf->lcd_control.vbyone_config->hw_filter_cnt =
+				para[1];
+			if (lcd_debug_print_flag) {
+				LCDPR("vbyone hw_filter=0x%x 0x%x\n",
+			pconf->lcd_control.vbyone_config->hw_filter_time,
+			pconf->lcd_control.vbyone_config->hw_filter_cnt);
+			}
+		}
 		break;
 	case LCD_MIPI:
 		ret = of_property_read_u32_array(child, "mipi_attr",
@@ -1001,6 +1014,10 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 		((*(p + LCD_UKEY_PCLK + 1)) << 8) |
 		((*(p + LCD_UKEY_PCLK + 2)) << 16) |
 		((*(p + LCD_UKEY_PCLK + 3)) << 24));
+	if (pconf->lcd_timing.lcd_clk == 0) { /* avoid 0 mistake */
+		pconf->lcd_timing.lcd_clk = 60;
+		LCDERR("lcd_clk is 0, default to 60Hz\n");
+	}
 	pconf->lcd_basic.h_period_min = (*(p + LCD_UKEY_H_PERIOD_MIN) |
 		((*(p + LCD_UKEY_H_PERIOD_MIN + 1)) << 8));
 	pconf->lcd_basic.h_period_max = (*(p + LCD_UKEY_H_PERIOD_MAX) |
@@ -1125,6 +1142,12 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 			pconf->lcd_control.vbyone_config->vsync_intr_en =
 				(*(p + LCD_UKEY_IF_ATTR_7) |
 				((*(p + LCD_UKEY_IF_ATTR_7 + 1)) << 8)) & 0xff;
+			pconf->lcd_control.vbyone_config->hw_filter_time =
+				*(p + LCD_UKEY_IF_ATTR_8) |
+				((*(p + LCD_UKEY_IF_ATTR_8 + 1)) << 8);
+			pconf->lcd_control.vbyone_config->hw_filter_cnt =
+				*(p + LCD_UKEY_IF_ATTR_9) |
+				((*(p + LCD_UKEY_IF_ATTR_9 + 1)) << 8);
 		}
 	} else
 		LCDERR("unsupport lcd_type: %d\n", pconf->lcd_basic.lcd_type);
@@ -1256,6 +1279,8 @@ static void lcd_set_vinfo(unsigned int sync_duration)
 
 	LCDPR("%s: sync_duration=%d\n", __func__, sync_duration);
 
+	lcd_vout_notify_mode_change_pre();
+
 	/* update vinfo */
 	lcd_drv->lcd_info->sync_duration_num = sync_duration;
 	lcd_drv->lcd_info->sync_duration_den = 100;
@@ -1268,22 +1293,11 @@ static void lcd_set_vinfo(unsigned int sync_duration)
 #endif
 
 	/* change clk parameter */
-	switch (lcd_drv->lcd_config->lcd_timing.clk_change) {
-	case LCD_CLK_PLL_CHANGE:
-		lcd_clk_generate_parameter(lcd_drv->lcd_config);
-		lcd_clk_set(lcd_drv->lcd_config);
-		break;
-	case LCD_CLK_FRAC_UPDATE:
-		lcd_clk_update(lcd_drv->lcd_config);
-		break;
-	default:
-		break;
-	}
+	lcd_clk_change(lcd_drv->lcd_config);
 	lcd_tablet_config_post_update(lcd_drv->lcd_config);
 	lcd_venc_change(lcd_drv->lcd_config);
 
-	vout_notifier_call_chain(VOUT_EVENT_MODE_CHANGE,
-		&lcd_drv->lcd_info->mode);
+	lcd_vout_notify_mode_change();
 }
 
 static int lcd_frame_rate_adjust_notifier(struct notifier_block *nb,

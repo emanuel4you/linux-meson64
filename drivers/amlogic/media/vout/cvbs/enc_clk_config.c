@@ -105,6 +105,9 @@ static void cvbs_set_vid1_clk(unsigned int src_pll)
 	/* vclk: 27M */
 	/* [31:28]=0 enci_clk_sel, select vclk_div1 */
 	cvbs_out_hiu_setb(HHI_VID_CLK_DIV, 0, 28, 4);
+	/* [31:28]=0 vdac_clk_sel, select vclk_div1 */
+	/* [19]=0 disable atv_demod clk for vdac */
+	cvbs_out_hiu_setb(HHI_VIID_CLK_DIV, 0, 19, 1);
 	cvbs_out_hiu_setb(HHI_VIID_CLK_DIV, 0, 28, 4);
 	/* release vclk_div_reset and enable vclk_div */
 	cvbs_out_hiu_setb(HHI_VID_CLK_DIV, 1, VCLK_XD_EN, 2);
@@ -150,6 +153,9 @@ static void cvbs_set_vid2_clk(unsigned int src_pll)
 	/* vclk: 27M */
 	/* [31:28]=8 enci_clk_sel, select vclk2_div1 */
 	cvbs_out_hiu_setb(HHI_VID_CLK_DIV, 8, 28, 4);
+	/* [31:28]=8 vdac_clk_sel, select vclk2_div1 */
+	/* [19]=0 disable atv_demod clk for vdac */
+	cvbs_out_hiu_setb(HHI_VIID_CLK_DIV, 0, 19, 1);
 	cvbs_out_hiu_setb(HHI_VIID_CLK_DIV, 8, 28, 4);
 	/* release vclk2_div_reset and enable vclk2_div */
 	cvbs_out_hiu_setb(HHI_VIID_CLK_DIV, 1, VCLK2_XD_EN, 2);
@@ -183,7 +189,8 @@ void set_vmode_clk(void)
 		cvbs_out_hiu_setb(HHI_VIID_CLK_CNTL, 0, VCLK2_EN, 1);
 		udelay(5);
 	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_G12A ||
-			cvbs_cpu_type() == CVBS_CPU_TYPE_G12B) {
+			cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
+			cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
 		if (cvbs_clk_path & 0x1) {
 			pr_info("config g12a gp0_pll\n");
 			cvbs_out_hiu_write(HHI_GP0_PLL_CNTL0, 0x180204f7);
@@ -234,6 +241,29 @@ void set_vmode_clk(void)
 		ret = pll_wait_lock(HHI_TCON_PLL_CNTL0, 31);
 		if (ret)
 			pr_info("[error]:tl1 tcon_pll lock failed\n");
+	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_TM2) {
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL0,	0x202f04f7);
+		udelay(100);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL0,	0x302f04f7);
+		udelay(100);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL1,	0x10110000);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL2,	0x00001108);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL3,	0x10051400);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL4,	0x010100c0);
+		udelay(100);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL4,	0x038300c0);
+		udelay(100);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL0,	0x342f04f7);
+		udelay(100);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL0,	0x142f04f7);
+		udelay(100);
+		cvbs_out_hiu_write(HHI_TCON_PLL_CNTL2,	0x00003008);
+		udelay(100);
+		ret = pll_wait_lock(HHI_TCON_PLL_CNTL0, 31);
+		if (ret)
+			pr_info("[error]:tl1 tcon_pll lock failed\n");
+		/* mux tcon pll */
+		cvbs_out_hiu_setb(HHI_LVDS_TX_PHY_CNTL1_TL1, 0, 29, 1);
 	} else {
 		pr_info("config eqafter gxl hdmi pll\n");
 		cvbs_out_hiu_write(HHI_HDMI_PLL_CNTL, 0x4000027b);
@@ -250,12 +280,14 @@ void set_vmode_clk(void)
 	}
 
 	if (cvbs_cpu_type() == CVBS_CPU_TYPE_G12A ||
-		cvbs_cpu_type() == CVBS_CPU_TYPE_G12B) {
+		cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
+		cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
 		if (cvbs_clk_path & 0x2)
 			cvbs_set_vid1_clk(cvbs_clk_path & 0x1);
 		else
 			cvbs_set_vid2_clk(cvbs_clk_path & 0x1);
-	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_TL1) {
+	} else if (cvbs_cpu_type() == CVBS_CPU_TYPE_TL1 ||
+		cvbs_cpu_type() == CVBS_CPU_TYPE_TM2) {
 		if (cvbs_clk_path & 0x2)
 			cvbs_set_vid1_clk(0);
 		else
@@ -274,7 +306,8 @@ void set_vmode_clk(void)
 void disable_vmode_clk(void)
 {
 	if (cvbs_cpu_type() == CVBS_CPU_TYPE_G12A ||
-		cvbs_cpu_type() == CVBS_CPU_TYPE_G12B) {
+		cvbs_cpu_type() == CVBS_CPU_TYPE_G12B ||
+		cvbs_cpu_type() == CVBS_CPU_TYPE_SM1) {
 		if (cvbs_clk_path & 0x2)
 			disable_vid1_clk_out();
 		else

@@ -33,6 +33,7 @@
 #include <linux/amlogic/cpu_version.h>
 #include <linux/amlogic/media/old_cpu_version.h>
 #include <linux/clk.h>
+#include <linux/errno.h>
 
 #define CONFIG_ARCH_MESON8
 
@@ -610,6 +611,22 @@ int __init gc2145_v4l2_probe(struct i2c_adapter *adapter)
 }
 #endif
 
+#ifdef CONFIG_AMLOGIC_VIDEO_CAPTURE_GC2145_MIPI
+int __init gc2145_mipi_v4l2_probe(struct i2c_adapter *adapter)
+{
+	int ret = 0;
+	unsigned char reg[2];
+
+	reg[0] = aml_i2c_get_byte_add8(adapter, 0x3c, 0xf0);
+	reg[1] = aml_i2c_get_byte_add8(adapter, 0x3c, 0xf1);
+	/*datasheet chip id is error*/
+	if (reg[0] == 0x21 && reg[1] == 0x45)
+		ret = 1;
+	pr_info("%s, ret = %d\n", __func__, ret);
+	return ret;
+}
+#endif
+
 struct aml_cam_dev_info_s {
 	unsigned char addr;
 	char *name;
@@ -895,6 +912,15 @@ static const struct aml_cam_dev_info_s cam_devs[] = {
 		.probe_func = gc2145_v4l2_probe,
 	},
 #endif
+#ifdef CONFIG_AMLOGIC_VIDEO_CAPTURE_GC2145_MIPI
+	{
+		.addr = 0x3c,
+		.name = "gc2145_mipi",
+		.pwdn = 1,
+		.max_cap_size = SIZE_1600X1200,
+		.probe_func = gc2145_mipi_v4l2_probe,
+	},
+#endif
 };
 
 static const struct aml_cam_dev_info_s *get_cam_info_by_name(const char *name)
@@ -1049,7 +1075,8 @@ void aml_cam_init(struct aml_cam_info_s *cam_dev)
 	if (get_cpu_type() == MESON_CPU_MAJOR_ID_GXBB)
 		GXBB_cam_enable_clk();
 	else if ((get_cpu_type() == MESON_CPU_MAJOR_ID_G12A) ||
-		(get_cpu_type() == MESON_CPU_MAJOR_ID_G12B))
+		(get_cpu_type() == MESON_CPU_MAJOR_ID_G12B) ||
+		(is_meson_sm1_cpu()))
 		GX12_cam_enable_clk();
 	else
 		cam_enable_clk(cam_dev->mclk, cam_dev->spread_spectrum);
@@ -1109,7 +1136,8 @@ void aml_cam_uninit(struct aml_cam_info_s *cam_dev)
 	if (get_cpu_type() == MESON_CPU_MAJOR_ID_GXBB)
 		GXBB_cam_disable_clk(cam_dev->spread_spectrum);
 	else if ((get_cpu_type() == MESON_CPU_MAJOR_ID_G12A) ||
-		(get_cpu_type() == MESON_CPU_MAJOR_ID_G12B))
+		(get_cpu_type() == MESON_CPU_MAJOR_ID_G12B) ||
+		(is_meson_sm1_cpu()))
 		GX12_cam_disable_clk(cam_dev->spread_spectrum);
 	else
 		cam_disable_clk(cam_dev->spread_spectrum);
@@ -1195,6 +1223,17 @@ static int fill_cam_dev(struct device_node *p_node,
 		pr_info("get camera name failed!\n");
 		goto err_out;
 	}
+
+	cam_dev->cam_vdd = of_get_named_gpio(p_node, "camvdd-gpios", 0);
+	pr_info("cam_dev->cam_vdd = %d\n", cam_dev->cam_vdd);
+	if (cam_dev->cam_vdd > 0) {
+		ret = gpio_request(cam_dev->cam_vdd, "camera");
+		if (ret < 0)
+			pr_info("aml_cam_init cam_vdd request failed\n");
+		else
+			gpio_direction_output(cam_dev->cam_vdd, 0);
+	} else
+		pr_info("%s: failed to map gpio_cam_vdd !\n", cam_dev->name);
 
 	cam_dev->pwdn_pin = of_get_named_gpio(p_node, "gpio_pwdn-gpios", 0);
 	if (cam_dev->pwdn_pin == 0) {

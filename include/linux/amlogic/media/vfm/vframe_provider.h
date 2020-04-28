@@ -40,6 +40,7 @@ struct vframe_states {
 #define VFRAME_EVENT_RECEIVER_GET_AUX_DATA			0x80
 #define VFRAME_EVENT_RECEIVER_DISP_MODE				0x100
 #define VFRAME_EVENT_RECEIVER_DOLBY_BYPASS_EL		0x200
+#define VFRAME_EVENT_RECEIVER_NEED_NO_COMP		0x400
 
 	/* for VFRAME_EVENT_RECEIVER_GET_AUX_DATA*/
 struct provider_aux_req_s {
@@ -51,6 +52,7 @@ struct provider_aux_req_s {
 	int aux_size;
 	int dv_enhance_exist;
 	int low_latency;
+	struct tvin_dv_vsif_s dv_vsif;/*dolby vsi info*/
 };
 struct provider_disp_mode_req_s {
 	/*input*/
@@ -92,6 +94,7 @@ extern int vf_notify_provider(const char *receiver_name, int event_type,
 extern int vf_notify_provider_by_name(const char *provider_name,
 				int event_type, void *data);
 
+void vf_light_reg_provider(struct vframe_provider_s *prov);
 void vf_light_unreg_provider(struct vframe_provider_s *prov);
 void vf_ext_light_unreg_provider(struct vframe_provider_s *prov);
 struct vframe_provider_s *vf_get_provider(const char *name);

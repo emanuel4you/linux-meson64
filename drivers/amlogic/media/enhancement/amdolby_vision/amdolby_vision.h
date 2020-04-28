@@ -20,7 +20,7 @@
 #define V1_5
 #define V2_4
 /*  driver version */
-#define DRIVER_VER "20181009"
+#define DRIVER_VER "20181220"
 
 #include <linux/types.h>
 
@@ -48,6 +48,19 @@
 #define TUNINGMODE_EXTLEVEL4_DISABLE     0x8
 #define TUNINGMODE_EXTLEVEL5_DISABLE     0x10
 #define TUNINGMODE_EL_FORCEDDISABLE      0x20
+
+enum core1_switch_type {
+	NO_SWITCH = 0,
+	SWITCH_BEFORE_DVCORE_1,
+	SWITCH_BEFORE_DVCORE_2,
+	SWITCH_AFTER_DVCORE,
+};
+
+enum core3_switch_type {
+	CORE3_AFTER_WM = 0,
+	CORE3_AFTER_OSD1_HDR,
+	CORE3_AFTER_VD2_HDR,
+};
 
 /*! @brief Output CSC configuration.*/
 # pragma pack(push, 1)
@@ -191,12 +204,19 @@ enum signal_format_e {
 	FORMAT_DOVI = 0,
 	FORMAT_HDR10 = 1,
 	FORMAT_SDR = 2,
-	FORMAT_DOVI_LL = 3
+	FORMAT_DOVI_LL = 3,
+	FORMAT_HLG = 4,
+	FORMAT_HDR10PLUS = 5,
+	FORMAT_SDR_2020 = 6,
+	FORMAT_MVC = 7
 };
 
 enum priority_mode_e {
 	VIDEO_PRIORITY = 0,
-	GRAPHIC_PRIORITY = 1
+	GRAPHIC_PRIORITY = 1,
+	/* same as video priority, but will only switch to video*/
+	/* priority after scene refresh flag has been received */
+	VIDEO_PRIORITY_DELAYED = 2
 };
 
 enum cp_signal_range_e {
@@ -355,7 +375,7 @@ struct dm_lut_ipcore_s {
 
 /** @brief hdmi metadata for IPCORE 3 */
 struct md_reister_ipcore_3_s {
-	uint32_t raw_metadata[128];
+	uint32_t raw_metadata[512];
 	uint32_t size;
 };
 
@@ -526,6 +546,7 @@ enum cpuID_e {
 	_CPU_MAJOR_ID_GXM,
 	_CPU_MAJOR_ID_TXLX,
 	_CPU_MAJOR_ID_G12,
+	_CPU_MAJOR_ID_TM2,
 	_CPU_MAJOR_ID_UNKNOWN,
 };
 

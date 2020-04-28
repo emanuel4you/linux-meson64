@@ -211,8 +211,7 @@
 #define HHI_DIF_TCON_CNTL0                         0x3c
 #define HHI_DIF_TCON_CNTL1                         0x3d
 #define HHI_DIF_TCON_CNTL2                         0x3e
-#define HHI_TCON_CLK_CNTL                          0xf0
-#define HHI_TCON_CLK_CNTL_TL1                      0x9c
+#define HHI_TCON_CLK_CNTL                          0x9c
 
 /*  Global control:  RESET_CBUS_BASE = 0x11 */
 #define VERSION_CTRL                               0x1100
@@ -982,8 +981,13 @@
 #define TCON_GPO_CTRL0                             0x2015
 #define TCON_GPO_CTRL1                             0x2016
 #define TCON_GPO_CTRL2                             0x2017
+#define TCON_INTR_WR                               0x2020
+#define TCON_INTR_CLR                              0x2021
 #define TCON_INTR_MASKN                            0x2022
-#define TCON_INTR                                  0x2023 /* read only */
+#define TCON_INTR_RO                               0x2023 /* read only */
+
+#define P2P_CH_SWAP0                               0x4200
+#define P2P_CH_SWAP1                               0x4201
 
 /* ********************************
  * Video post-processing:  VPP_VCBUS_BASE = 0x1d

@@ -116,6 +116,37 @@ static int iw7027_wregs(struct spi_device *spi, unsigned char addr,
 	return ret;
 }
 
+static int iw7027_reg_write(unsigned char *buf, unsigned int len)
+{
+	int ret;
+
+	if (len > 28) {
+		LDIMERR("%s: unsupport len: %d\n", __func__, len);
+		return -1;
+	}
+
+	if (len > 1)
+		ret = iw7027_wreg(bl_iw7027->spi, buf[0], buf[1]);
+	else
+		ret = iw7027_wregs(bl_iw7027->spi, buf[0], &buf[1], (len - 1));
+
+	return ret;
+}
+
+static int iw7027_reg_read(unsigned char *buf, unsigned int len)
+{
+	int ret;
+
+	if (len > 1) {
+		LDIMERR("%s: unsupport len: %d\n", __func__, len);
+		return -1;
+	}
+
+	ret = iw7027_rreg(bl_iw7027->spi, buf[0], &buf[0]);
+
+	return ret;
+}
+
 static int ldim_power_cmd_dynamic_size(void)
 {
 	unsigned char *table;
@@ -468,6 +499,7 @@ static int iw7027_smr(unsigned short *buf, unsigned char len)
 	dim_max = ldim_drv->ldev_conf->dim_max;
 	dim_min = ldim_drv->ldev_conf->dim_min;
 
+#if 0 /* this function will cause backlight flicker */
 	if (ldim_drv->vsync_change_flag == 50) {
 		iw7027_wreg(bl_iw7027->spi, 0x31, 0xd7);
 		ldim_drv->vsync_change_flag = 0;
@@ -475,6 +507,7 @@ static int iw7027_smr(unsigned short *buf, unsigned char len)
 		iw7027_wreg(bl_iw7027->spi, 0x31, 0xd3);
 		ldim_drv->vsync_change_flag = 0;
 	}
+#endif
 	if (bl_iw7027->test_mode) {
 		if (test_brightness == NULL) {
 			if (vsync_cnt == 0)
@@ -693,6 +726,9 @@ static int iw7027_ldim_driver_update(struct aml_ldim_driver_s *ldim_drv)
 	ldim_drv->device_power_off = iw7027_power_off;
 	ldim_drv->device_bri_update = iw7027_smr;
 	ldim_drv->device_bri_check = iw7027_check;
+
+	ldim_drv->ldev_conf->dev_reg_write = iw7027_reg_write;
+	ldim_drv->ldev_conf->dev_reg_read = iw7027_reg_read;
 	return 0;
 }
 

@@ -555,6 +555,9 @@ static void xhci_clear_port_change_bit(struct xhci_hcd *xhci, u16 wValue,
 	if (DEV_HIGHSPEED(port_status) &&
 		(wValue == USB_PORT_FEAT_C_RESET))
 		set_usb_phy_host_tuning(wIndex, 0);
+	if (DEV_LOWSPEED(port_status) &&
+		(wValue == USB_PORT_FEAT_C_RESET))
+		set_usb_phy_host_low_reset(wIndex);
 #endif
 }
 
@@ -1324,7 +1327,9 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			 */
 			if ((temp & PORT_PE) == 0 ||
 				(link_state > USB_SS_PORT_LS_U3)) {
+#ifndef CONFIG_AMLOGIC_USB
 				xhci_warn(xhci, "Cannot set link state.\n");
+#endif
 				goto error;
 			}
 
