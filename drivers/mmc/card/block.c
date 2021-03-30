@@ -2691,6 +2691,16 @@ again:
 	 * messages to tell when the card is present.
 	 */
 
+	/*
+	 * On Set-Top-Boxes we want the removeable flag set for
+	 * anything that is actually removable.
+	 * So we do set it if MMC_CAP_NONREMOVABLE is true
+	 * (in contrary to what the comment above states)
+	 */
+
+	if (!(card->host->caps & MMC_CAP_NONREMOVABLE))
+		md->disk->flags |= GENHD_FL_REMOVABLE;
+
 	snprintf(md->disk->disk_name, sizeof(md->disk->disk_name),
 		 "mmcblk%u%s", card->host->index, subname ? subname : "");
 

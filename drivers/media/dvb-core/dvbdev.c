@@ -767,7 +767,7 @@ static int dvbdev_check_free_adapter_num(int num)
 
 static int dvbdev_get_free_adapter_num (void)
 {
-	int num = 0;
+	int num = 1;
 
 	while (num < DVB_MAX_ADAPTERS) {
 		if (dvbdev_check_free_adapter_num(num))

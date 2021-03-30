@@ -3653,6 +3653,7 @@ static int aml_cec_probe(struct platform_device *pdev)
 	cec_dev->cpu_type = get_cpu_type();
 	cec_dev->node = pdev->dev.of_node;
 	cec_dev->proble_finish = false;
+	cec_dev->hal_flag |= (1 << HDMI_OPTION_SYSTEM_CEC_CONTROL);
 	phy_addr_test = 0;
 	CEC_ERR("cec driver date:%s\n", CEC_DRIVER_VERSION);
 	cec_dbg_init();

@@ -1223,7 +1223,7 @@
 		product_desc = "G12B"; /* Max Chars: 16    */
 		cec_osd_string = "AML_MBOX"; /* Max Chars: 14    */
 		port_num = <1>;
-		ee_cec;
+		/*ee_cec;*/
 		arc_port_mask = <0x2>;
 		interrupts = <0 203 1
 					0 199 1>;	/*0:snps 1:ts*/

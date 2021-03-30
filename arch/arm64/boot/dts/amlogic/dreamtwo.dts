@@ -1,7 +1,5 @@
 /*
- * drivers/amlogic/drm/am_meson_vpu.h
- *
- * Copyright (C) 2017 Amlogic, Inc. All rights reserved.
+ * Copyright (C) 2020 Dream Property GmbH, Germany
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,11 +12,8 @@
  * more details.
  *
  */
-#ifndef __AM_MESON_VPU_H
-#define __AM_MESON_VPU_H
 
-struct am_meson_vpu_data {
-	uint32_t version;
-};
+/dts-v1/;
 
-#endif /* __AM_MESON_VPU_H */
+#include "dreamone.dts"
+#include "dreamtwo-panel.dtsi"

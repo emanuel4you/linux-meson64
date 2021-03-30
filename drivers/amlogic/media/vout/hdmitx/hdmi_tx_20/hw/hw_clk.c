@@ -1020,6 +1020,14 @@ static void hdmitx_set_clk_(struct hdmitx_dev *hdev)
 	enum hdmi_color_space cs = hdev->para->cs;
 	enum hdmi_color_depth cd = hdev->para->cd;
 
+	/* use color depth if available */
+	if (hdev->cur_video_param->color_depth &&
+			hdev->cur_video_param->color_depth > 0)
+		cd = hdev->cur_video_param->color_depth;
+
+	if (hdev->para->cs == COLORSPACE_YUV420)
+		vic |= HDMITX_VIC420_OFFSET;
+
 	/* YUV 422 always use 24B mode */
 	if (cs == COLORSPACE_YUV422)
 		cd = COLORDEPTH_24B;

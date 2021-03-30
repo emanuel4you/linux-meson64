@@ -514,6 +514,7 @@ static int set_disp_mode_auto_int(int force)
 	struct hdmi_format_para *para = NULL;
 	unsigned char mode[32];
 	enum hdmi_vic vic = HDMI_Unknown;
+	enum hdmi_color_depth current_color_depth;
 	/* vic_ready got from IP */
 	enum hdmi_vic vic_ready = hdev->hwop.getstate(
 		hdev, STAT_VIDEO_VIC, 0);
@@ -526,6 +527,8 @@ static int set_disp_mode_auto_int(int force)
 	if ((info == NULL) || (info->name == NULL))
 		return -1;
 
+	/* take care of current one */
+	current_color_depth = hdev->para->cd;
 	pr_info(SYS "get current mode: %s\n", info->name);
 
 	/*update hdmi checksum to vout*/
@@ -547,6 +550,7 @@ static int set_disp_mode_auto_int(int force)
 		hdev->hwop.cntlconfig(hdev, CONF_CLR_VSDB_PACKET, 0);
 		hdev->hwop.cntlmisc(hdev, MISC_TMDS_PHY_OP, TMDS_PHY_DISABLE);
 		hdev->para = hdmi_get_fmt_name("invalid", hdev->fmt_attr);
+		hdev->para->cd = current_color_depth;
 		if (hdev->cedst_policy)
 			cancel_delayed_work(&hdev->work_cedst);
 		return -1;
@@ -568,18 +572,54 @@ static int set_disp_mode_auto_int(int force)
 		}
 	}
 
-	/* In the file hdmi_common/hdmi_parameters.c,
-	 * the data array all_fmt_paras[] treat 2160p60hz and 2160p60hz420
-	 * as two different modes, such Scrambler
-	 * So if node "attr" contains 420, need append 420 to mode.
-	 */
-	if (strstr(hdev->fmt_attr, "420")) {
-		if (!strstr(mode, "420"))
-			strlcat(mode, "420", sizeof(mode));
+	para = hdmi_get_fmt_name(mode, hdev->fmt_attr);
+
+	if (strstr(hdmitx_device.fmt_attr, "422") == NULL) {
+		/* 422 not set, default to 420 for 4k modes */
+		switch ((para->vic & 0xff)) {
+		case HDMI_3840x2160p50_16x9:
+		case HDMI_3840x2160p60_16x9:
+		case HDMI_4096x2160p50_256x135:
+		case HDMI_4096x2160p60_256x135:
+		case HDMI_3840x2160p50_64x27:
+		case HDMI_3840x2160p60_64x27:
+			para->cs = COLORSPACE_YUV420;
+			break;
+		default:
+			break;
+		}
 	}
 
-	para = hdmi_get_fmt_name(mode, hdev->fmt_attr);
 	hdev->para = para;
+
+	if (hdev->cur_video_param != NULL) {
+
+		if (strstr(hdmitx_device.fmt_attr, "bit") != NULL)
+			hdev->cur_video_param->color_depth = para->cd;
+		else
+			hdev->cur_video_param->color_depth = COLORDEPTH_30B;
+
+		if (hdev->cur_video_param->color_depth > COLORDEPTH_24B) {
+			int dc_support = 0;
+
+			if (hdev->rxcap.ColorDeepSupport & 0x78 && hdev->para->cs != COLORSPACE_YUV420)
+				dc_support = 1;
+			else if ((hdev->rxcap.hf_ieeeoui) &&
+							((hdev->rxcap.dc_30bit_420 && hdev->cur_video_param->color_depth == COLORDEPTH_30B) ||
+							(hdev->rxcap.dc_36bit_420 && hdev->cur_video_param->color_depth == COLORDEPTH_36B) ||
+							(hdev->rxcap.dc_48bit_420 && hdev->cur_video_param->color_depth == COLORDEPTH_48B)))
+				dc_support = 1;
+
+			if (dc_support == 0) {
+				printk("color depth is set to %d bits but display does not support deep color\n", hdev->cur_video_param->color_depth * 2);
+				if (strstr(hdmitx_device.fmt_attr, "bit") == NULL)
+					hdev->cur_video_param->color_depth = COLORDEPTH_24B;
+			}
+		}
+	}
+
+	para->cd = current_color_depth;
+
 	vic = hdmitx_edid_get_VIC(hdev, mode, 1);
 	if (strncmp(info->name, "2160p30hz", strlen("2160p30hz")) == 0) {
 		vic = HDMI_4k2k_30;
@@ -678,7 +718,10 @@ static ssize_t show_disp_mode(struct device *dev,
 static ssize_t store_disp_mode(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	set_disp_mode(buf);
+	if (strstr(buf,"reset"))
+		set_disp_mode_auto();
+	else
+		set_disp_mode(buf);
 	return count;
 }
 
@@ -1574,7 +1617,7 @@ static void update_current_para(struct hdmitx_dev *hdev)
 	strncpy(mode, info->name, sizeof(mode) - 1);
 	if (strstr(hdev->fmt_attr, "420")) {
 		if (strstr(mode, "420") == NULL)
-			strncat(mode, "420", 3);
+			strlcat(mode, "420", sizeof(mode));
 	}
 	hdev->para = hdmi_get_fmt_name(mode, hdev->fmt_attr);
 }
@@ -4746,7 +4789,7 @@ static void hdmitx_fmt_attr(struct hdmitx_dev *hdev)
 	}
 	pr_info(SYS "fmt_attr %s\n", hdev->fmt_attr);
 }
-
+#if 0
 static void hdmitx_init_fmt_attr(struct hdmitx_dev *hdev)
 {
 	if (strlen(hdev->fmt_attr) >= 8) {
@@ -4760,6 +4803,7 @@ static void hdmitx_init_fmt_attr(struct hdmitx_dev *hdev)
 		hdmitx_fmt_attr(hdev);
 	pr_info(SYS "fmt_attr %s\n", hdev->fmt_attr);
 }
+#endif
 
 /* for notify to cec */
 static BLOCKING_NOTIFIER_HEAD(hdmitx_event_notify_list);
@@ -5319,9 +5363,6 @@ static int amhdmitx_probe(struct platform_device *pdev)
 	hdmitx_extcon_register(pdev, dev);
 
 	HDMITX_Meson_Init(&hdmitx_device);
-
-	/* update fmt_attr */
-	hdmitx_init_fmt_attr(&hdmitx_device);
 
 	hdmitx_device.task = kthread_run(hdmi_task_handle,
 		&hdmitx_device, "kthread_hdmi");
